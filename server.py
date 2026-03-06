@@ -24,6 +24,11 @@ from fastapi.templating import Jinja2Templates
 
 from config import load_config, CONFIG_DIR
 from db import init_db, log_activity, get_recent_activity
+import asyncio
+from db import get_all_pr_status, get_pending_drafts, update_draft_status
+from modules.pr_manager import poll_prs
+from modules.notifier import notify
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -74,8 +79,23 @@ async def lifespan(app: FastAPI):
         _config["server"]["port"],
     )
 
+    # Start scheduler
+    scheduler = AsyncIOScheduler()
+
+    async def _poll_prs_job():
+        config = load_config()
+        async def _notify(msg, pr_url, event):
+            await notify(config, msg, pr_url, event)
+        await poll_prs(DB_PATH, config, notify_fn=_notify)
+
+    app.state.poll_prs_job = _poll_prs_job
+    scheduler.add_job(_poll_prs_job, "interval", minutes=5, id="pr_poll")
+    scheduler.start()
+    app.state.scheduler = scheduler
+
     yield
 
+    scheduler.shutdown()
     await log_activity(DB_PATH, module="server", action="stopped", detail="Daemon stopped")
     logger.info("daily_automate stopped")
 
@@ -125,7 +145,54 @@ async def activity_html(request: Request):
 @app.post("/api/trigger/{module}")
 async def trigger(module: str):
     await log_activity(DB_PATH, module=module, action="triggered", detail="Manual trigger from UI")
+    if module == "pr_manager" and hasattr(app.state, "poll_prs_job"):
+        asyncio.create_task(app.state.poll_prs_job())
     return {"message": f"{module} triggered", "status": "queued"}
+
+
+@app.get("/api/prs")
+async def api_prs():
+    prs = await get_all_pr_status(DB_PATH)
+    return prs
+
+
+@app.get("/api/drafts")
+async def api_drafts():
+    drafts = await get_pending_drafts(DB_PATH)
+    return drafts
+
+
+@app.get("/api/drafts/html", response_class=HTMLResponse)
+async def drafts_html():
+    drafts = await get_pending_drafts(DB_PATH)
+    if not drafts:
+        return HTMLResponse('<div class="placeholder" style="min-height: 120px;"><p>No pending drafts. New review comments will appear here.</p></div>')
+    html = ""
+    for draft in drafts:
+        pr_short = draft["pr_url"].replace("https://github.com/", "")
+        html += f'''<div class="card draft-card" id="draft-{draft["id"]}">
+            <div class="card-title"><a href="{draft["pr_url"]}" target="_blank">{pr_short}</a></div>
+            <div class="draft-text">{draft["draft_text"]}</div>
+            <div class="draft-actions">
+                <button class="btn btn-primary" hx-post="/api/drafts/{draft["id"]}/approve" hx-target="#draft-{draft["id"]}" hx-swap="outerHTML">Approve</button>
+                <button class="btn" hx-post="/api/drafts/{draft["id"]}/reject" hx-target="#draft-{draft["id"]}" hx-swap="outerHTML">Reject</button>
+            </div>
+        </div>\n'''
+    return HTMLResponse(html)
+
+
+@app.post("/api/drafts/{draft_id}/approve")
+async def approve_draft(draft_id: int):
+    await update_draft_status(DB_PATH, draft_id=draft_id, status="approved")
+    await log_activity(DB_PATH, module="pr_manager", action="draft_approved", detail=f"Draft #{draft_id} approved")
+    return HTMLResponse(f'<div class="card draft-card" style="opacity: 0.5;"><div class="card-detail">Draft #{draft_id} approved</div></div>')
+
+
+@app.post("/api/drafts/{draft_id}/reject")
+async def reject_draft(draft_id: int):
+    await update_draft_status(DB_PATH, draft_id=draft_id, status="rejected")
+    await log_activity(DB_PATH, module="pr_manager", action="draft_rejected", detail=f"Draft #{draft_id} rejected")
+    return HTMLResponse(f'<div class="card draft-card" style="opacity: 0.5;"><div class="card-detail">Draft #{draft_id} rejected</div></div>')
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +229,9 @@ async def dashboard(request: Request):
 
 @app.get("/prs", response_class=HTMLResponse)
 async def prs_page(request: Request):
-    return _render(request, "placeholder.html", title="PRs", description="PR management coming in Phase 2")
+    prs = await get_all_pr_status(DB_PATH)
+    drafts = await get_pending_drafts(DB_PATH)
+    return _render(request, "prs.html", prs=prs, drafts=drafts)
 
 
 @app.get("/reviews", response_class=HTMLResponse)
