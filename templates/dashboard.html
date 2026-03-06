@@ -1,4 +1,64 @@
 {% extends "base.html" %}
+{% block title %}Dashboard — daily_automate{% endblock %}
 {% block content %}
-<h1>daily_automate</h1>
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p>Your personal automation hub</p>
+</div>
+
+<div class="card-grid">
+    <div class="card">
+        <div class="card-title">PRs Open</div>
+        <div class="card-value">&mdash;</div>
+        <div class="card-detail">Phase 2</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Reviews Pending</div>
+        <div class="card-value">&mdash;</div>
+        <div class="card-detail">Phase 4</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Reminders Today</div>
+        <div class="card-value">&mdash;</div>
+        <div class="card-detail">Phase 3</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Server Uptime</div>
+        <div class="card-value" id="uptime"
+             hx-get="/api/health"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML">
+            &hellip;
+        </div>
+        <div class="card-detail">Live</div>
+    </div>
+</div>
+
+<div class="btn-group">
+    <button hx-post="/api/trigger/standup" hx-swap="none">Run Standup</button>
+    <button hx-post="/api/trigger/review_prs" hx-swap="none">Review PRs</button>
+    <button hx-post="/api/trigger/digest" hx-swap="none">Generate Digest</button>
+    <button hx-post="/api/trigger/metrics" hx-swap="none">Check Metrics</button>
+    <button hx-post="/api/trigger/weekly" hx-swap="none">Weekly Summary</button>
+</div>
+
+<div class="activity-feed"
+     hx-get="/api/activity/html"
+     hx-trigger="load, every 10s"
+     hx-swap="innerHTML">
+    <h2>Recent Activity</h2>
+    {% if activity %}
+        {% for item in activity %}
+        <div class="activity-item">
+            <span class="activity-time">{{ item.timestamp[:16] if item.timestamp else "" }}</span>
+            <span class="activity-module">{{ item.module }}</span>
+            <span class="activity-text">{{ item.action }}{% if item.detail %} &mdash; {{ item.detail }}{% endif %}</span>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="activity-item">
+            <span class="activity-text">No activity yet. Trigger an automation to get started.</span>
+        </div>
+    {% endif %}
+</div>
 {% endblock %}

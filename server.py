@@ -101,6 +101,27 @@ async def activity():
     return entries
 
 
+@app.get("/api/activity/html", response_class=HTMLResponse)
+async def activity_html(request: Request):
+    entries = await get_recent_activity(DB_PATH, limit=20)
+    html = '<h2>Recent Activity</h2>\n'
+    if entries:
+        for item in entries:
+            ts = item["timestamp"][:16] if item.get("timestamp") else ""
+            html += (
+                f'<div class="activity-item">'
+                f'<span class="activity-time">{ts}</span>'
+                f'<span class="activity-module">{item["module"]}</span>'
+                f'<span class="activity-text">{item["action"]}'
+            )
+            if item.get("detail"):
+                html += f' &mdash; {item["detail"]}'
+            html += '</span></div>\n'
+    else:
+        html += '<div class="activity-item"><span class="activity-text">No activity yet. Trigger an automation to get started.</span></div>'
+    return HTMLResponse(html)
+
+
 @app.post("/api/trigger/{module}")
 async def trigger(module: str):
     await log_activity(DB_PATH, module=module, action="triggered", detail="Manual trigger from UI")

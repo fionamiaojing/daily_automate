@@ -1,5 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>daily_automate</title></head>
-<body>{% block content %}{% endblock %}</body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}daily_automate{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-logo">daily_automate</div>
+        <nav class="sidebar-nav">
+            {% for name, path in pages %}
+            <a href="{{ path }}" class="{% if current_path == path %}active{% endif %}">{{ name }}</a>
+            {% endfor %}
+        </nav>
+    </aside>
+    <main class="main">
+        {% block content %}{% endblock %}
+    </main>
+    <script src="/static/app.js"></script>
+</body>
 </html>
