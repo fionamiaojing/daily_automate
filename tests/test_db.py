@@ -11,6 +11,8 @@ from db import (
     init_db, log_activity, get_recent_activity,
     upsert_pr_status, get_all_pr_status, get_pr_status,
     create_pr_draft, get_pending_drafts, update_draft_status,
+    create_standup, get_standups, get_latest_standup,
+    create_reminder, get_active_reminders, dismiss_reminder, snooze_reminder,
 )
 
 
@@ -124,3 +126,53 @@ def test_update_draft_preserves_other_drafts(db_path):
     run(update_draft_status(db_path, draft_id=drafts[0]["id"], status="approved"))
     remaining = run(get_pending_drafts(db_path))
     assert len(remaining) == 1
+
+
+def test_create_and_get_standups(db_path):
+    run(init_db(db_path))
+    run(create_standup(db_path, date="2026-03-05", content="Did stuff"))
+    run(create_standup(db_path, date="2026-03-04", content="Did other stuff"))
+    standups = run(get_standups(db_path, limit=10))
+    assert len(standups) == 2
+    assert standups[0]["date"] == "2026-03-05"
+
+
+def test_get_latest_standup(db_path):
+    run(init_db(db_path))
+    run(create_standup(db_path, date="2026-03-04", content="Yesterday"))
+    run(create_standup(db_path, date="2026-03-05", content="Today"))
+    latest = run(get_latest_standup(db_path))
+    assert latest is not None
+    assert latest["content"] == "Today"
+
+
+def test_get_latest_standup_empty(db_path):
+    run(init_db(db_path))
+    latest = run(get_latest_standup(db_path))
+    assert latest is None
+
+
+def test_create_and_get_active_reminders(db_path):
+    run(init_db(db_path))
+    run(create_reminder(db_path, type="morning", content="2 PRs pending review"))
+    run(create_reminder(db_path, type="periodic", content="Stale PR #123"))
+    reminders = run(get_active_reminders(db_path))
+    assert len(reminders) == 2
+
+
+def test_dismiss_reminder(db_path):
+    run(init_db(db_path))
+    run(create_reminder(db_path, type="morning", content="Check PRs"))
+    reminders = run(get_active_reminders(db_path))
+    run(dismiss_reminder(db_path, reminder_id=reminders[0]["id"]))
+    active = run(get_active_reminders(db_path))
+    assert len(active) == 0
+
+
+def test_snooze_reminder(db_path):
+    run(init_db(db_path))
+    run(create_reminder(db_path, type="morning", content="Check PRs"))
+    reminders = run(get_active_reminders(db_path))
+    run(snooze_reminder(db_path, reminder_id=reminders[0]["id"], until="2026-03-05 14:00:00"))
+    active = run(get_active_reminders(db_path))
+    assert active[0]["snoozed_until"] == "2026-03-05 14:00:00"

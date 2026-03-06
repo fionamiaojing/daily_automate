@@ -185,3 +185,67 @@ async def update_draft_status(db_path: Path, draft_id: int, status: str) -> None
             (status, draft_id),
         )
         await conn.commit()
+
+
+async def create_standup(db_path: Path, date: str, content: str) -> int:
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.execute(
+            "INSERT INTO standups (date, content) VALUES (?, ?)",
+            (date, content),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_standups(db_path: Path, limit: int = 10) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM standups ORDER BY date DESC LIMIT ?", (limit,)
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_latest_standup(db_path: Path) -> dict | None:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM standups ORDER BY date DESC LIMIT 1"
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def create_reminder(db_path: Path, type: str, content: str, due_at: str | None = None) -> int:
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.execute(
+            "INSERT INTO reminders (type, content, due_at) VALUES (?, ?, ?)",
+            (type, content, due_at),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_active_reminders(db_path: Path) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM reminders WHERE dismissed = 0 ORDER BY created_at DESC"
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def dismiss_reminder(db_path: Path, reminder_id: int) -> None:
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.execute(
+            "UPDATE reminders SET dismissed = 1 WHERE id = ?", (reminder_id,)
+        )
+        await conn.commit()
+
+
+async def snooze_reminder(db_path: Path, reminder_id: int, until: str) -> None:
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.execute(
+            "UPDATE reminders SET snoozed_until = ? WHERE id = ?", (until, reminder_id)
+        )
+        await conn.commit()
