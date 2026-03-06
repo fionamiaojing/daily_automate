@@ -32,10 +32,11 @@ async def _run_gh(*args: str) -> str:
     return stdout.decode()
 
 
-async def fetch_my_open_prs() -> list[dict]:
-    """Fetch all open PRs authored by the current user across all repos."""
+async def fetch_my_open_prs(owner: str = "doordash") -> list[dict]:
+    """Fetch open PRs authored by the current user in a given org."""
     output = await _run_gh(
         "search", "prs", "--author", "@me", "--state", "open",
+        "--owner", owner,
         "--json", "url,number,title,repository",
     )
     return json.loads(output)
@@ -129,7 +130,17 @@ async def poll_prs(
         title = pr["title"]
 
         # Fetch PR details (CI, branch, state)
-        details = await fetch_pr_details(repo, pr_number)
+        try:
+            details = await fetch_pr_details(repo, pr_number)
+        except Exception as e:
+            logger.error("Failed to fetch details for PR #%d in %s: %s", pr_number, repo, e)
+            # Still store the PR with unknown status so it appears on dashboard
+            await upsert_pr_status(
+                db_path, pr_url=pr_url, repo=repo, title=title,
+                ci_status="unknown",
+            )
+            continue
+
         ci_status = details["ci_status"]
         head_branch = details["head_branch"]
         pr_state = details["state"]

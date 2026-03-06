@@ -35,7 +35,10 @@ def test_fetch_my_open_prs(mock_gh):
     prs = run(fetch_my_open_prs())
     assert len(prs) == 1
     assert prs[0]["title"] == "Fix bug"
-    mock_gh.assert_called_once()
+    # Verify it filters by doordash org by default
+    call_args = mock_gh.call_args[0]
+    assert "--owner" in call_args
+    assert "doordash" in call_args
 
 
 @patch("modules.pr_manager._run_gh")

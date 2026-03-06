@@ -35,11 +35,11 @@ async def _run_cmd(*args: str, timeout: int = 300) -> str:
     return stdout.decode().strip()
 
 
-async def fetch_review_requested_prs() -> list[dict]:
-    """Fetch PRs where your review is requested across all repos."""
+async def fetch_review_requested_prs(owner: str = "doordash") -> list[dict]:
+    """Fetch PRs where your review is requested in a given org."""
     output = await _run_cmd(
         "gh", "search", "prs", "--review-requested", "@me",
-        "--state", "open",
+        "--state", "open", "--owner", owner,
         "--json", "url,number,title,repository",
     )
     if not output:
