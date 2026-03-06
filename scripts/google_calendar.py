@@ -31,8 +31,11 @@ def fetch_todays_events() -> list[dict]:
 
     events = []
     for item in result.get("items", []):
-        start = item["start"].get("dateTime", item["start"].get("date", ""))
-        end = item["end"].get("dateTime", item["end"].get("date", ""))
+        # Skip all-day events (they have "date" but no "dateTime")
+        if "dateTime" not in item.get("start", {}):
+            continue
+        start = item["start"]["dateTime"]
+        end = item["end"].get("dateTime", "")
         attendees = [a.get("email", "") for a in item.get("attendees", [])]
 
         # Extract Google Meet link
