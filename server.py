@@ -28,7 +28,6 @@ import asyncio
 from db import get_all_pr_status, get_pending_drafts, update_draft_status
 from db import get_standups, get_latest_standup, get_active_reminders, dismiss_reminder, snooze_reminder
 from db import get_reviews, get_digests, get_latest_digest
-from db import get_jira_automations
 from db import get_metrics_checks, get_metrics_history, get_weekly_summaries, create_metrics_check
 from modules.pr_manager import poll_prs
 from modules.notifier import notify
@@ -36,7 +35,6 @@ from modules.standup import generate_standup
 from modules.reminders import morning_summary, periodic_nudge
 from modules.pr_reviewer import review_prs
 from modules.slack_digest import generate_digest
-from modules.jira_automation import run_jira_automation
 from modules.metrics import run_metrics_checks
 from modules.weekly import generate_weekly_summary
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -136,13 +134,6 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(_review_prs_job, "interval", hours=1, id="pr_review")
     scheduler.add_job(_digest_job, "cron", hour=8, minute=0, day_of_week="mon-fri", id="slack_digest")
 
-    async def _jira_job():
-        config = load_config()
-        await run_jira_automation(DB_PATH, config)
-
-    app.state.jira_job = _jira_job
-    scheduler.add_job(_jira_job, "interval", minutes=30, id="jira_poll")
-
     async def _metrics_job():
         config = load_config()
         await run_metrics_checks(DB_PATH, config)
@@ -232,8 +223,6 @@ async def trigger(module: str):
         asyncio.create_task(app.state.review_prs_job())
     elif module == "digest" and hasattr(app.state, "digest_job"):
         asyncio.create_task(app.state.digest_job())
-    elif module == "jira" and hasattr(app.state, "jira_job"):
-        asyncio.create_task(app.state.jira_job())
     elif module == "metrics" and hasattr(app.state, "metrics_job"):
         asyncio.create_task(app.state.metrics_job())
     elif module == "weekly" and hasattr(app.state, "weekly_job"):
@@ -306,9 +295,6 @@ async def api_digests():
     return await get_digests(DB_PATH, limit=10)
 
 
-@app.get("/api/jira")
-async def api_jira():
-    return await get_jira_automations(DB_PATH, limit=50)
 
 
 @app.get("/api/metrics")
@@ -371,7 +357,6 @@ PAGES = [
     ("Reviews", "/reviews"),
     ("Standup", "/standup"),
     ("Digest", "/digest"),
-    ("JIRA", "/jira"),
     ("Metrics", "/metrics"),
     ("Reminders", "/reminders"),
     ("Weekly", "/weekly"),
@@ -424,10 +409,6 @@ async def digest_page(request: Request):
     return _render(request, "digest.html", digests=digests)
 
 
-@app.get("/jira", response_class=HTMLResponse)
-async def jira_page(request: Request):
-    automations = await get_jira_automations(DB_PATH, limit=50)
-    return _render(request, "jira.html", automations=automations)
 
 
 @app.get("/metrics", response_class=HTMLResponse)
