@@ -301,6 +301,63 @@ button:disabled {
     color: var(--text-muted);
 }
 
+/* ----- PR page ----- */
+.section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.pr-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.pr-title a {
+    color: var(--accent);
+}
+
+.pr-title a:hover {
+    text-decoration: underline;
+}
+
+.ci-badge {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.ci-success { background: #22c55e; }
+.ci-failure { background: #ef4444; }
+.ci-pending { background: #eab308; }
+.ci-unknown { background: var(--text-muted); }
+
+.draft-card {
+    margin-bottom: 1rem;
+}
+
+.draft-text {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin: 0.75rem 0;
+    white-space: pre-wrap;
+}
+
+.draft-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
 /* ----- HTMX indicator ----- */
 .htmx-indicator {
     opacity: 0;
