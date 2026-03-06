@@ -32,7 +32,12 @@
             {% if m.meet_link %}
             <a class="meet-link" href="{{ m.meet_link }}" target="_blank">Join Meet</a>
             {% endif %}
-            {% if m.attendees %}
+            {% if m.other_name %}
+            <div class="meeting-attendees">
+                with {{ m.other_name }}
+                <span class="rsvp-badge rsvp-{{ m.other_rsvp }}">{{ m.other_rsvp | replace("needsAction", "pending") }}</span>
+            </div>
+            {% elif m.attendees %}
             <div class="meeting-attendees">{{ m.attendees | length }} attendee{{ 's' if m.attendees | length != 1 else '' }}</div>
             {% endif %}
         </div>
