@@ -13,6 +13,8 @@ from db import (
     create_pr_draft, get_pending_drafts, update_draft_status,
     create_standup, get_standups, get_latest_standup,
     create_reminder, get_active_reminders, dismiss_reminder, snooze_reminder,
+    create_review, get_reviews, get_reviews_for_pr,
+    create_digest, get_digests, get_latest_digest,
 )
 
 
@@ -176,3 +178,44 @@ def test_snooze_reminder(db_path):
     run(snooze_reminder(db_path, reminder_id=reminders[0]["id"], until="2026-03-05 14:00:00"))
     active = run(get_active_reminders(db_path))
     assert active[0]["snoozed_until"] == "2026-03-05 14:00:00"
+
+
+def test_create_and_get_reviews(db_path):
+    run(init_db(db_path))
+    run(create_review(db_path, pr_url="https://github.com/org/repo/pull/5", review_summary="Looks good, minor nit on line 42", action_taken=""))
+    run(create_review(db_path, pr_url="https://github.com/org/repo/pull/6", review_summary="Needs refactor", action_taken=""))
+    reviews = run(get_reviews(db_path, limit=10))
+    assert len(reviews) == 2
+
+
+def test_get_reviews_for_pr(db_path):
+    run(init_db(db_path))
+    run(create_review(db_path, pr_url="https://github.com/org/repo/pull/5", review_summary="First review", action_taken=""))
+    run(create_review(db_path, pr_url="https://github.com/org/repo/pull/6", review_summary="Other PR", action_taken=""))
+    reviews = run(get_reviews_for_pr(db_path, pr_url="https://github.com/org/repo/pull/5"))
+    assert len(reviews) == 1
+    assert reviews[0]["review_summary"] == "First review"
+
+
+def test_create_and_get_digests(db_path):
+    run(init_db(db_path))
+    run(create_digest(db_path, date="2026-03-05", content="Today's digest", channels="#eng-feed,#ai-news"))
+    run(create_digest(db_path, date="2026-03-04", content="Yesterday's digest", channels="#eng-feed"))
+    digests = run(get_digests(db_path, limit=10))
+    assert len(digests) == 2
+    assert digests[0]["date"] == "2026-03-05"
+
+
+def test_get_latest_digest(db_path):
+    run(init_db(db_path))
+    run(create_digest(db_path, date="2026-03-04", content="Yesterday"))
+    run(create_digest(db_path, date="2026-03-05", content="Today"))
+    latest = run(get_latest_digest(db_path))
+    assert latest is not None
+    assert latest["content"] == "Today"
+
+
+def test_get_latest_digest_empty(db_path):
+    run(init_db(db_path))
+    latest = run(get_latest_digest(db_path))
+    assert latest is None

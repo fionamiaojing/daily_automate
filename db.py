@@ -249,3 +249,60 @@ async def snooze_reminder(db_path: Path, reminder_id: int, until: str) -> None:
             "UPDATE reminders SET snoozed_until = ? WHERE id = ?", (until, reminder_id)
         )
         await conn.commit()
+
+
+async def create_review(db_path: Path, pr_url: str, review_summary: str, action_taken: str = "") -> int:
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.execute(
+            "INSERT INTO reviews (pr_url, review_summary, action_taken) VALUES (?, ?, ?)",
+            (pr_url, review_summary, action_taken),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_reviews(db_path: Path, limit: int = 10) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM reviews ORDER BY created_at DESC LIMIT ?", (limit,)
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_reviews_for_pr(db_path: Path, pr_url: str) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM reviews WHERE pr_url = ? ORDER BY created_at DESC", (pr_url,)
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def create_digest(db_path: Path, date: str, content: str, channels: str = "") -> int:
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.execute(
+            "INSERT INTO digests (date, content, channels) VALUES (?, ?, ?)",
+            (date, content, channels),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_digests(db_path: Path, limit: int = 10) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM digests ORDER BY date DESC LIMIT ?", (limit,)
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_latest_digest(db_path: Path) -> dict | None:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM digests ORDER BY date DESC LIMIT 1"
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
