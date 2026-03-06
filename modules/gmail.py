@@ -10,12 +10,14 @@ from db import log_activity
 
 logger = logging.getLogger("daily_automate.gmail")
 
-SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
+BASE_DIR = Path(__file__).resolve().parent.parent
+SCRIPTS_DIR = BASE_DIR / "scripts"
+VENV_PYTHON = str(BASE_DIR / ".venv" / "bin" / "python")
 
 
 async def _run_script(script: str, timeout: int = 60) -> str:
     proc = await asyncio.create_subprocess_exec(
-        "python3", str(SCRIPTS_DIR / script),
+        VENV_PYTHON, str(SCRIPTS_DIR / script),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=str(SCRIPTS_DIR),
