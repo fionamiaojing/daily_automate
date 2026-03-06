@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Metrics — daily_automate{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Metrics</h1>
+    <p>Configurable shell-command checks with threshold alerts</p>
+</div>
+
+<div class="btn-group">
+    <button hx-post="/api/trigger/metrics" hx-swap="none">Run Checks Now</button>
+</div>
+
+<div class="section-title">Add New Check</div>
+<form class="metric-form" hx-post="/api/metrics/add" hx-swap="none" hx-on::after-request="this.reset(); location.reload();">
+    <input type="text" name="name" placeholder="Check name" required>
+    <input type="text" name="query" placeholder="Shell command (e.g. curl -s ...)" required style="flex: 2;">
+    <input type="number" name="threshold" placeholder="Threshold" step="any" required>
+    <button type="submit" class="btn btn-primary">Add</button>
+</form>
+
+{% if checks %}
+    <div class="section-title">Configured Checks</div>
+    {% for check in checks %}
+    <div class="card" style="margin-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-weight: 600;">{{ check.name }}</span>
+            {% if check.last_value is not none %}
+                {% if check.threshold is not none and check.last_value > check.threshold %}
+                    <span class="metric-value metric-alert">{{ check.last_value }}</span>
+                {% else %}
+                    <span class="metric-value metric-ok">{{ check.last_value }}</span>
+                {% endif %}
+            {% else %}
+                <span class="metric-value" style="color: var(--text-muted);">--</span>
+            {% endif %}
+        </div>
+        <div class="card-detail">
+            Threshold: {{ check.threshold }} | Command: <code>{{ check.query }}</code>
+        </div>
+        {% if check.last_checked %}
+        <div class="card-detail">Last checked: {{ check.last_checked[:16] }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="placeholder" style="min-height: 200px;">
+        <p>No metrics checks configured. Use the form above to add your first check.</p>
+    </div>
+{% endif %}
+{% endblock %}
