@@ -69,6 +69,7 @@ async def review_prs(db_path: Path, config: dict) -> list[dict]:
     prs = await fetch_review_requested_prs()
     if not prs:
         logger.info("No PRs requesting review")
+        await log_activity(db_path, module="pr_reviewer", action="review_complete", detail="No PRs requesting review")
         return []
 
     results = []
@@ -96,4 +97,6 @@ async def review_prs(db_path: Path, config: dict) -> list[dict]:
 
         results.append({"pr_url": pr_url, "title": title, "review": review_text})
 
+    await log_activity(db_path, module="pr_reviewer", action="review_complete",
+                       detail=f"Reviewed {len(results)} PRs")
     return results

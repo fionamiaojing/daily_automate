@@ -104,6 +104,11 @@ async def poll_prs(
         prs = await fetch_my_open_prs()
     except Exception as e:
         logger.error("Failed to fetch PRs: %s", e)
+        await log_activity(db_path, module="pr_manager", action="poll_failed", detail=str(e))
+        return
+
+    if not prs:
+        await log_activity(db_path, module="pr_manager", action="poll_complete", detail="No open PRs found")
         return
 
     for pr in prs:
@@ -162,3 +167,6 @@ async def poll_prs(
                     f"New review comment from {author} on PR #{pr_number} — draft reply ready",
                     pr_url, "draft_ready",
                 )
+
+    await log_activity(db_path, module="pr_manager", action="poll_complete",
+                       detail=f"Checked {len(prs)} open PRs")

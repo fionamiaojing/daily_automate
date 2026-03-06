@@ -18,11 +18,12 @@ document.body.addEventListener("htmx:afterRequest", function (event) {
     el.disabled = true;
 
     if (isTrigger) {
-        /* Jobs run in the background — poll until new activity appears, then reload */
+        /* Record the trigger timestamp so we can detect new activity after it */
+        var triggerTime = new Date().toISOString().slice(0, 19).replace("T", " ");
         var attempts = 0;
         var poll = setInterval(function () {
             attempts++;
-            if (attempts > 12) {  /* Give up after ~60s */
+            if (attempts > 60) {  /* Give up after ~5 min */
                 clearInterval(poll);
                 el.textContent = original;
                 el.disabled = false;
@@ -31,10 +32,15 @@ document.body.addEventListener("htmx:afterRequest", function (event) {
             fetch("/api/activity")
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
-                    /* Check if latest activity is a completion (not just "triggered") */
-                    if (data.length > 0 && data[0].action !== "triggered") {
-                        clearInterval(poll);
-                        location.reload();
+                    /* Look for any non-"triggered" entry newer than our trigger */
+                    for (var i = 0; i < data.length; i++) {
+                        if (data[i].action === "triggered") continue;
+                        if (data[i].timestamp >= triggerTime) {
+                            clearInterval(poll);
+                            location.reload();
+                            return;
+                        }
+                        break; /* older entries won't match either */
                     }
                 });
         }, 5000);
