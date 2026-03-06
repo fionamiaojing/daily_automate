@@ -66,17 +66,15 @@ async def link_prs_to_tickets(db_path: Path, projects: list[str]) -> list[dict]:
 async def run_jira_automation(db_path: Path, config: dict) -> None:
     """Main JIRA automation loop: link PRs, transition tickets, create subtasks."""
     jira_config = config.get("jira", {})
-    base_url = jira_config.get("base_url", "")
-    email = jira_config.get("email", "")
-    api_token = jira_config.get("api_token", "")
     projects = jira_config.get("projects", [])
     auto_transition = jira_config.get("auto_transition", True)
 
-    if not base_url or not email or not api_token:
-        logger.info("JIRA not configured — skipping automation")
+    if not projects:
+        logger.info("No JIRA projects configured — skipping automation")
+        await log_activity(db_path, module="jira", action="poll_complete", detail="No projects configured")
         return
 
-    client = JiraClient(base_url=base_url, email=email, api_token=api_token)
+    client = JiraClient()
 
     # Link PRs to tickets
     linked = await link_prs_to_tickets(db_path, projects=projects)

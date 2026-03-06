@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 
 import pytest
 
@@ -20,47 +20,25 @@ def test_extract_ticket_key_from_branch():
     assert extract_ticket_key("PACHI-789") == "PACHI-789"
 
 
-def test_jira_client_init():
-    client = JiraClient(base_url="https://test.atlassian.net", email="a@b.com", api_token="tok")
-    assert client.base_url == "https://test.atlassian.net"
-
-
-@patch("modules.jira_client.httpx.AsyncClient")
-def test_get_issue(mock_client_cls):
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = {"key": "PROJ-123", "fields": {"status": {"name": "To Do"}}}
-    mock_resp.raise_for_status = MagicMock()
-
-    mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=mock_resp)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client_cls.return_value = mock_client
-
-    client = JiraClient(base_url="https://test.atlassian.net", email="a@b.com", api_token="tok")
+@patch("modules.jira_client._run_claude")
+def test_get_issue(mock_claude):
+    mock_claude.return_value = '{"fields": {"status": {"name": "To Do"}, "summary": "Fix bug"}}'
+    client = JiraClient()
     result = run(client.get_issue("PROJ-123"))
-    assert result["key"] == "PROJ-123"
+    assert result["fields"]["status"]["name"] == "To Do"
 
 
-@patch("modules.jira_client.httpx.AsyncClient")
-def test_transition_issue(mock_client_cls):
-    transitions_resp = MagicMock()
-    transitions_resp.status_code = 200
-    transitions_resp.json.return_value = {"transitions": [{"id": "31", "name": "In Progress"}, {"id": "41", "name": "Done"}]}
-    transitions_resp.raise_for_status = MagicMock()
+@patch("modules.jira_client._run_claude")
+def test_get_issue_messy_output(mock_claude):
+    mock_claude.return_value = 'Here is the result:\n{"fields": {"status": {"name": "In Progress"}, "summary": "Add feature"}}\nDone.'
+    client = JiraClient()
+    result = run(client.get_issue("PROJ-123"))
+    assert result["fields"]["status"]["name"] == "In Progress"
 
-    transition_resp = MagicMock()
-    transition_resp.status_code = 204
-    transition_resp.raise_for_status = MagicMock()
 
-    mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=transitions_resp)
-    mock_client.post = AsyncMock(return_value=transition_resp)
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client_cls.return_value = mock_client
-
-    client = JiraClient(base_url="https://test.atlassian.net", email="a@b.com", api_token="tok")
+@patch("modules.jira_client._run_claude")
+def test_transition_issue(mock_claude):
+    mock_claude.return_value = "OK"
+    client = JiraClient()
     result = run(client.transition_issue("PROJ-123", "Done"))
     assert result is True
