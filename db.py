@@ -128,3 +128,60 @@ async def get_recent_activity(db_path: Path, limit: int = 20) -> list[dict]:
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+
+async def upsert_pr_status(db_path: Path, pr_url: str, repo: str, title: str, ci_status: str) -> None:
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.execute(
+            """INSERT INTO pr_status (pr_url, repo, title, ci_status, last_checked)
+               VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(pr_url) DO UPDATE SET
+                 ci_status = excluded.ci_status,
+                 title = excluded.title,
+                 last_checked = CURRENT_TIMESTAMP""",
+            (pr_url, repo, title, ci_status),
+        )
+        await conn.commit()
+
+
+async def get_all_pr_status(db_path: Path) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM pr_status ORDER BY last_checked DESC")
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_pr_status(db_path: Path, pr_url: str) -> dict | None:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM pr_status WHERE pr_url = ?", (pr_url,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def create_pr_draft(db_path: Path, pr_url: str, comment_id: str, draft_text: str) -> int:
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.execute(
+            "INSERT INTO pr_drafts (pr_url, comment_id, draft_text) VALUES (?, ?, ?)",
+            (pr_url, comment_id, draft_text),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_pending_drafts(db_path: Path) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM pr_drafts WHERE status = 'pending' ORDER BY created_at DESC"
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def update_draft_status(db_path: Path, draft_id: int, status: str) -> None:
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.execute(
+            "UPDATE pr_drafts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (status, draft_id),
+        )
+        await conn.commit()

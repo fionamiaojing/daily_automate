@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 import aiosqlite
 
-from db import init_db, log_activity, get_recent_activity
+from db import (
+    init_db, log_activity, get_recent_activity,
+    upsert_pr_status, get_all_pr_status, get_pr_status,
+    create_pr_draft, get_pending_drafts, update_draft_status,
+)
 
 
 @pytest.fixture
@@ -59,3 +63,64 @@ def test_get_recent_activity_respects_limit(db_path):
         run(log_activity(db_path, module="test", action=f"action_{i}", detail=""))
     activities = run(get_recent_activity(db_path, limit=3))
     assert len(activities) == 3
+
+
+def test_upsert_pr_status_insert(db_path):
+    run(init_db(db_path))
+    run(upsert_pr_status(db_path, pr_url="https://github.com/org/repo/pull/1", repo="org/repo", title="Fix bug", ci_status="pending"))
+    prs = run(get_all_pr_status(db_path))
+    assert len(prs) == 1
+    assert prs[0]["ci_status"] == "pending"
+    assert prs[0]["title"] == "Fix bug"
+
+
+def test_upsert_pr_status_update(db_path):
+    run(init_db(db_path))
+    run(upsert_pr_status(db_path, pr_url="https://github.com/org/repo/pull/1", repo="org/repo", title="Fix bug", ci_status="pending"))
+    run(upsert_pr_status(db_path, pr_url="https://github.com/org/repo/pull/1", repo="org/repo", title="Fix bug", ci_status="success"))
+    prs = run(get_all_pr_status(db_path))
+    assert len(prs) == 1
+    assert prs[0]["ci_status"] == "success"
+
+
+def test_get_pr_status_single(db_path):
+    run(init_db(db_path))
+    run(upsert_pr_status(db_path, pr_url="https://github.com/org/repo/pull/1", repo="org/repo", title="Fix", ci_status="success"))
+    pr = run(get_pr_status(db_path, pr_url="https://github.com/org/repo/pull/1"))
+    assert pr is not None
+    assert pr["ci_status"] == "success"
+
+
+def test_get_pr_status_not_found(db_path):
+    run(init_db(db_path))
+    pr = run(get_pr_status(db_path, pr_url="https://github.com/org/repo/pull/999"))
+    assert pr is None
+
+
+def test_create_and_get_pending_drafts(db_path):
+    run(init_db(db_path))
+    run(create_pr_draft(db_path, pr_url="https://github.com/org/repo/pull/1", comment_id="c1", draft_text="Looks good, thanks!"))
+    run(create_pr_draft(db_path, pr_url="https://github.com/org/repo/pull/1", comment_id="c2", draft_text="Will fix."))
+    drafts = run(get_pending_drafts(db_path))
+    assert len(drafts) == 2
+    assert drafts[0]["status"] == "pending"
+
+
+def test_update_draft_status(db_path):
+    run(init_db(db_path))
+    run(create_pr_draft(db_path, pr_url="https://github.com/org/repo/pull/1", comment_id="c1", draft_text="Thanks!"))
+    drafts = run(get_pending_drafts(db_path))
+    draft_id = drafts[0]["id"]
+    run(update_draft_status(db_path, draft_id=draft_id, status="approved"))
+    updated_drafts = run(get_pending_drafts(db_path))
+    assert len(updated_drafts) == 0
+
+
+def test_update_draft_preserves_other_drafts(db_path):
+    run(init_db(db_path))
+    run(create_pr_draft(db_path, pr_url="https://github.com/org/repo/pull/1", comment_id="c1", draft_text="Reply 1"))
+    run(create_pr_draft(db_path, pr_url="https://github.com/org/repo/pull/1", comment_id="c2", draft_text="Reply 2"))
+    drafts = run(get_pending_drafts(db_path))
+    run(update_draft_status(db_path, draft_id=drafts[0]["id"], status="approved"))
+    remaining = run(get_pending_drafts(db_path))
+    assert len(remaining) == 1
