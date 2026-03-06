@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
     <h1>Your PRs</h1>
-    <p>Open pull requests and pending reply drafts</p>
+    <p>Open pull requests with inline review comments</p>
 </div>
 <div class="btn-group">
     <button class="btn btn-primary" hx-post="/api/trigger/pr_manager" hx-swap="none">Poll PRs Now</button>
@@ -18,7 +18,22 @@
             <span class="ci-badge ci-{{ pr.ci_status }}"></span>
             <a href="{{ pr.pr_url }}" target="_blank">{{ pr.title }}</a>
         </div>
-        <div class="card-detail">CI: {{ pr.ci_status }}</div>
+        <div class="card-detail">CI: {{ pr.ci_status }}{% if pr.head_branch %} · {{ pr.head_branch }}{% endif %}</div>
+
+        {% if drafts_by_pr.get(pr.pr_url) %}
+        <div class="pr-drafts">
+            <div class="drafts-header">Pending Drafts ({{ drafts_by_pr[pr.pr_url] | length }})</div>
+            {% for draft in drafts_by_pr[pr.pr_url] %}
+            <div class="draft-card" id="draft-{{ draft.id }}">
+                <div class="draft-text">{{ draft.draft_text }}</div>
+                <div class="draft-actions">
+                    <button class="btn btn-sm btn-primary" hx-post="/api/drafts/{{ draft.id }}/approve" hx-target="#draft-{{ draft.id }}" hx-swap="outerHTML">Approve</button>
+                    <button class="btn btn-sm" hx-post="/api/drafts/{{ draft.id }}/reject" hx-target="#draft-{{ draft.id }}" hx-swap="outerHTML">Reject</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
@@ -27,23 +42,4 @@
     <p>No open PRs tracked yet. Click "Poll PRs Now" to fetch.</p>
 </div>
 {% endif %}
-<h2 class="section-title" style="margin-top: 2rem;">Pending Reply Drafts</h2>
-<div id="drafts-list" hx-get="/api/drafts/html" hx-trigger="load, every 15s" hx-swap="innerHTML">
-    {% if drafts %}
-        {% for draft in drafts %}
-        <div class="card draft-card" id="draft-{{ draft.id }}">
-            <div class="card-title"><a href="{{ draft.pr_url }}" target="_blank">{{ draft.pr_url | replace("https://github.com/", "") }}</a></div>
-            <div class="draft-text">{{ draft.draft_text }}</div>
-            <div class="draft-actions">
-                <button class="btn btn-primary" hx-post="/api/drafts/{{ draft.id }}/approve" hx-target="#draft-{{ draft.id }}" hx-swap="outerHTML">Approve</button>
-                <button class="btn" hx-post="/api/drafts/{{ draft.id }}/reject" hx-target="#draft-{{ draft.id }}" hx-swap="outerHTML">Reject</button>
-            </div>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div class="placeholder" style="min-height: 120px;">
-            <p>No pending drafts. New review comments will appear here.</p>
-        </div>
-    {% endif %}
-</div>
 {% endblock %}

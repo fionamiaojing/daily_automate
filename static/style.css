@@ -338,24 +338,50 @@ button:disabled {
 .ci-pending { background: #eab308; }
 .ci-unknown { background: var(--text-muted); }
 
-.draft-card {
-    margin-bottom: 1rem;
+/* ----- PR drafts (nested under PR card) ----- */
+.pr-drafts {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
 }
 
-.draft-text {
+.drafts-header {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.draft-card {
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0.75rem;
-    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.draft-card:last-child {
+    margin-bottom: 0;
+}
+
+.draft-text {
+    font-size: 0.8125rem;
     line-height: 1.6;
-    margin: 0.75rem 0;
     white-space: pre-wrap;
+    color: var(--text-secondary);
 }
 
 .draft-actions {
     display: flex;
     gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
 }
 
 /* ----- HTMX indicator ----- */

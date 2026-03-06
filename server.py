@@ -399,7 +399,11 @@ async def dashboard(request: Request):
 async def prs_page(request: Request):
     prs = await get_all_pr_status(DB_PATH)
     drafts = await get_pending_drafts(DB_PATH)
-    return _render(request, "prs.html", prs=prs, drafts=drafts)
+    # Group drafts by PR URL so the template can show them under each PR
+    drafts_by_pr: dict[str, list[dict]] = {}
+    for d in drafts:
+        drafts_by_pr.setdefault(d["pr_url"], []).append(d)
+    return _render(request, "prs.html", prs=prs, drafts_by_pr=drafts_by_pr)
 
 
 @app.get("/reviews", response_class=HTMLResponse)
