@@ -1,4 +1,9 @@
-"""Slack Digest module: daily digest from monitored Slack channels."""
+"""Slack Digest module: daily digest from monitored Slack channels.
+
+Generates both:
+1. A full HTML report via /ai-digest skill -> ~/Desktop/learn/claude/ailearnings/
+2. A text summary stored in the DB for the dashboard
+"""
 from __future__ import annotations
 
 import asyncio
@@ -11,46 +16,25 @@ from modules.notifier import notify
 
 logger = logging.getLogger("daily_automate.slack_digest")
 
+REPORT_DIR = Path.home() / "Desktop" / "learn" / "claude" / "ailearnings"
 
-async def _run_cmd(*args: str) -> str:
+
+async def _run_cmd(*args: str, timeout: int = 600) -> str:
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, stderr = await proc.communicate()
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        logger.error("Command timed out after %ds: %s", timeout, " ".join(args))
+        return ""
     if proc.returncode != 0:
         logger.warning("Command failed: %s\n%s", " ".join(args), stderr.decode())
         return ""
     return stdout.decode().strip()
-
-
-def build_digest_prompt(channels: list[dict]) -> str:
-    """Build the prompt for generating a Slack digest.
-
-    channels: list of dicts with 'name' and 'id' keys.
-    """
-    if not channels:
-        return (
-            "Generate a brief daily digest summary. No specific channels were configured. "
-            "Mention that the user should add channels to config.yaml under slack.digest_channels."
-        )
-    channel_lines = "\n".join(
-        f"- {ch['name']} (Slack ID: {ch['id']})" for ch in channels
-    )
-    return (
-        f"Generate a daily digest of important messages from the last 24 hours "
-        f"in these Slack channels:\n{channel_lines}\n\n"
-        f"For each channel, use slack_read_channel with the channel ID to fetch recent messages.\n\n"
-        f"For each channel, summarize:\n"
-        f"- Key announcements or decisions\n"
-        f"- Important discussions or threads (use slack_read_thread for context)\n"
-        f"- Action items mentioned\n"
-        f"- New tools, tips, or resources shared\n\n"
-        f"If a channel had no activity, note it briefly.\n"
-        f"Keep it concise — 2-4 bullet points per active channel. "
-        f"Use a casual, conversational tone."
-    )
 
 
 def parse_digest_output(output: str) -> str:
@@ -61,10 +45,7 @@ def parse_digest_output(output: str) -> str:
 
 
 def _normalize_channels(raw: list) -> list[dict]:
-    """Normalize channel config to list of {name, id} dicts.
-
-    Supports both old format (list of strings) and new format (list of dicts).
-    """
+    """Normalize channel config to list of {name, id} dicts."""
     channels = []
     for item in raw:
         if isinstance(item, dict):
@@ -75,25 +56,53 @@ def _normalize_channels(raw: list) -> list[dict]:
 
 
 async def generate_digest(db_path: Path, config: dict) -> str:
-    """Generate a Slack digest and save it.
+    """Generate a Slack digest: full HTML report via /ai-digest + text summary.
 
-    Returns the digest text.
+    Returns the summary text.
     """
+    today = datetime.now().strftime("%Y-%m-%d")
+    report_path = str(REPORT_DIR / f"ai-report-{today}.html")
+
+    # Step 1: Run /ai-digest skill via claude to generate the full HTML report.
+    # The skill handles channel reading, thread fetching, ranking, and HTML generation.
+    logger.info("Running /ai-digest to generate HTML report...")
+    await _run_cmd(
+        "claude", "-p", "/ai-digest", "--output-format", "text",
+        timeout=600,  # ai-digest can take a while reading threads
+    )
+
+    # Step 2: Generate a short text summary for the dashboard
     raw_channels = config.get("slack", {}).get("digest_channels", [])
     channels = _normalize_channels(raw_channels)
-    prompt = build_digest_prompt(channels)
+    channels_str = ", ".join(ch["name"] for ch in channels) if channels else ""
 
-    # Call Claude with Slack MCP access
-    output = await _run_cmd("claude", "-p", prompt, "--output-format", "text")
-    digest_text = parse_digest_output(output)
+    # Check if the report was created
+    actual_report_path = report_path if Path(report_path).exists() else ""
+
+    if actual_report_path:
+        # Ask Claude to summarize the generated report for the dashboard
+        summary_output = await _run_cmd(
+            "claude", "-p",
+            f"Read the file at {actual_report_path} and produce a plain-text summary "
+            f"of the top 5 most important items. No HTML. Keep it under 300 words. "
+            f"Format as a numbered list with the channel source in parentheses.",
+            "--output-format", "text",
+        )
+        summary_text = parse_digest_output(summary_output)
+    else:
+        summary_text = "(AI digest report was not generated — check logs)"
 
     # Save to DB
-    today = datetime.now().strftime("%Y-%m-%d")
-    channels_str = ", ".join(ch["name"] for ch in channels) if channels else ""
-    await create_digest(db_path, date=today, content=digest_text, channels=channels_str)
+    await create_digest(
+        db_path, date=today, content=summary_text,
+        channels=channels_str, report_path=actual_report_path,
+    )
     await log_activity(db_path, module="slack_digest", action="generated", detail=f"Digest for {today}")
 
     # Notify Slack
-    await notify(config, message=f"*Daily Digest — {today}*\n\n{digest_text}")
+    msg = f"*Daily Digest — {today}*\n\n{summary_text}"
+    if actual_report_path:
+        msg += f"\n\nFull report: {actual_report_path}"
+    await notify(config, message=msg)
 
-    return digest_text
+    return summary_text

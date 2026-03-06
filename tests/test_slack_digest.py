@@ -5,34 +5,33 @@ from unittest.mock import patch
 
 import pytest
 
-from modules.slack_digest import build_digest_prompt, parse_digest_output
+from modules.slack_digest import parse_digest_output, _normalize_channels
 
 
-def run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
-
-
-def test_build_digest_prompt_with_channels():
-    channels = [
+def test_normalize_channels_dict_format():
+    raw = [
         {"name": "#ai-adoption", "id": "C05946FLL85"},
         {"name": "#ai-dev-tooling", "id": "C08D0TKLU3V"},
     ]
-    prompt = build_digest_prompt(channels=channels)
-    assert "#ai-adoption" in prompt
-    assert "C05946FLL85" in prompt
-    assert "digest" in prompt.lower()
+    result = _normalize_channels(raw)
+    assert len(result) == 2
+    assert result[0]["name"] == "#ai-adoption"
+    assert result[0]["id"] == "C05946FLL85"
 
 
-def test_build_digest_prompt_empty():
-    prompt = build_digest_prompt(channels=[])
-    assert "no" in prompt.lower() or "digest" in prompt.lower()
+def test_normalize_channels_string_format():
+    raw = ["#general", "#random"]
+    result = _normalize_channels(raw)
+    assert len(result) == 2
+    assert result[0]["name"] == "#general"
+    assert result[0]["id"] == ""
 
 
 def test_parse_digest_output():
-    output = "## #eng-feed\n- New PR merged\n\n## #ai-news\n- GPT-5 announced"
+    output = "1. New Claude model announced (#ai-adoption)\n2. MCP server update (#proj-foundations-mcp)"
     result = parse_digest_output(output)
-    assert "eng-feed" in result
-    assert "GPT-5" in result
+    assert "Claude model" in result
+    assert "MCP" in result
 
 
 def test_parse_digest_output_empty():

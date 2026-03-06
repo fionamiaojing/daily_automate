@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS digests (
     date DATE NOT NULL,
     content TEXT NOT NULL,
     channels TEXT DEFAULT '',
+    report_path TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -286,11 +287,11 @@ async def get_reviews_for_pr(db_path: Path, pr_url: str) -> list[dict]:
         return [dict(row) for row in await cursor.fetchall()]
 
 
-async def create_digest(db_path: Path, date: str, content: str, channels: str = "") -> int:
+async def create_digest(db_path: Path, date: str, content: str, channels: str = "", report_path: str = "") -> int:
     async with aiosqlite.connect(db_path) as conn:
         cursor = await conn.execute(
-            "INSERT INTO digests (date, content, channels) VALUES (?, ?, ?)",
-            (date, content, channels),
+            "INSERT INTO digests (date, content, channels, report_path) VALUES (?, ?, ?, ?)",
+            (date, content, channels, report_path),
         )
         await conn.commit()
         return cursor.lastrowid

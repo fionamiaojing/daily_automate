@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
     <h1>Digest</h1>
-    <p>Daily Slack channel digests</p>
+    <p>Daily AI channel digests with full HTML reports</p>
 </div>
 
 <div class="btn-group">
@@ -17,6 +17,9 @@
         {% if digests[0].channels %}
         <div class="card-detail"><strong>Channels:</strong> {{ digests[0].channels }}</div>
         {% endif %}
+        {% if digests[0].report_path %}
+        <a class="doc-link" href="file://{{ digests[0].report_path }}" target="_blank" style="margin-bottom: 0.75rem;">Open Full Report</a>
+        {% endif %}
         <div class="standup-content">{{ digests[0].content }}</div>
     </div>
 
@@ -27,6 +30,9 @@
             <div class="standup-date">{{ digest.date }}</div>
             {% if digest.channels %}
             <div class="card-detail"><strong>Channels:</strong> {{ digest.channels }}</div>
+            {% endif %}
+            {% if digest.report_path %}
+            <a class="doc-link" href="file://{{ digest.report_path }}" target="_blank">Open Full Report</a>
             {% endif %}
             <div class="standup-content">{{ digest.content }}</div>
         </div>
