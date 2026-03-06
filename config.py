@@ -27,6 +27,14 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "default_channel": "",
         "digest_channels": [],
     },
+    "jira": {
+        "base_url": "",
+        "email": "",
+        "api_token": "",
+        "projects": [],
+        "auto_transition": True,
+        "subtask_templates": [],
+    },
     "server": {
         "host": "127.0.0.1",
         "port": 8080,

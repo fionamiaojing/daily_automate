@@ -26,6 +26,20 @@ slack:
     - "#eng-feed"
     - "#ai-news"
 
+jira:
+  base_url: "https://your-domain.atlassian.net"
+  email: "your-email@company.com"
+  api_token: "your-jira-api-token"
+  projects:
+    - "PROJ"
+    - "DISC"
+  auto_transition: true
+  subtask_templates:
+    - summary: "Write tests"
+      description: "Add unit tests for the changes"
+    - summary: "Update documentation"
+      description: "Update relevant docs"
+
 server:
   host: "127.0.0.1"
   port: 8080
