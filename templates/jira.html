@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}JIRA — daily_automate{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>JIRA</h1>
+    <p>Automated ticket management</p>
+</div>
+
+<div class="btn-group">
+    <button hx-post="/api/trigger/jira" hx-swap="none">Run JIRA Sync</button>
+</div>
+
+{% if automations %}
+    <div class="section-title">Recent Automations</div>
+    {% for auto in automations %}
+    <div class="card" style="margin-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="jira-ticket">{{ auto.ticket_key }}</span>
+            <span class="standup-date">{{ auto.timestamp[:16] if auto.timestamp else "" }}</span>
+        </div>
+        <div class="card-detail" style="margin-top: 0.25rem;">{{ auto.action }}</div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="placeholder" style="min-height: 200px;">
+        <p>No JIRA automations yet. Configure your JIRA credentials in config.yaml, then click "Run JIRA Sync".</p>
+    </div>
+{% endif %}
+{% endblock %}
