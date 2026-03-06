@@ -19,6 +19,20 @@ document.body.addEventListener("htmx:afterRequest", function (event) {
     }, 2000);
 });
 
+/* ----- Dashboard stats: parse /api/dashboard/stats and update cards ----- */
+document.body.addEventListener("htmx:beforeSwap", function (event) {
+    if (event.detail.target.id === "prs-count") {
+        try {
+            var data = JSON.parse(event.detail.serverResponse);
+            event.detail.serverResponse = String(data.prs_open);
+            // Also update drafts count if it exists
+            var draftsEl = document.getElementById("drafts-count");
+            if (draftsEl) draftsEl.textContent = String(data.drafts_pending);
+        } catch (e) {}
+        return;
+    }
+});
+
 /* ----- Uptime card: parse /api/health JSON and format ----- */
 document.body.addEventListener("htmx:beforeSwap", function (event) {
     if (event.detail.target.id !== "uptime") return;

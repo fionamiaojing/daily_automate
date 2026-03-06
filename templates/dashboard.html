@@ -9,13 +9,19 @@
 <div class="card-grid">
     <div class="card">
         <div class="card-title">PRs Open</div>
-        <div class="card-value">&mdash;</div>
-        <div class="card-detail">Phase 2</div>
+        <div class="card-value" id="prs-count"
+             hx-get="/api/dashboard/stats" hx-trigger="load, every 30s"
+             hx-swap="innerHTML" hx-select-oob="#prs-count">
+            {{ prs_open if prs_open is defined else "—" }}
+        </div>
+        <div class="card-detail"><a href="/prs">View PRs</a></div>
     </div>
     <div class="card">
-        <div class="card-title">Reviews Pending</div>
-        <div class="card-value">&mdash;</div>
-        <div class="card-detail">Phase 4</div>
+        <div class="card-title">Drafts Pending</div>
+        <div class="card-value" id="drafts-count">
+            {{ drafts_pending if drafts_pending is defined else "—" }}
+        </div>
+        <div class="card-detail"><a href="/prs">Review drafts</a></div>
     </div>
     <div class="card">
         <div class="card-title">Reminders Today</div>

@@ -115,6 +115,16 @@ async def health():
     return {"status": "ok", "uptime": uptime}
 
 
+@app.get("/api/dashboard/stats")
+async def dashboard_stats():
+    prs = await get_all_pr_status(DB_PATH)
+    drafts = await get_pending_drafts(DB_PATH)
+    return {
+        "prs_open": len(prs),
+        "drafts_pending": len(drafts),
+    }
+
+
 @app.get("/api/activity")
 async def activity():
     entries = await get_recent_activity(DB_PATH, limit=50)
@@ -224,7 +234,9 @@ def _render(request: Request, template: str, **kwargs):
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     act = await get_recent_activity(DB_PATH, limit=20)
-    return _render(request, "dashboard.html", activity=act)
+    prs = await get_all_pr_status(DB_PATH)
+    drafts = await get_pending_drafts(DB_PATH)
+    return _render(request, "dashboard.html", activity=act, prs_open=len(prs), drafts_pending=len(drafts))
 
 
 @app.get("/prs", response_class=HTMLResponse)
