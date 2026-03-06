@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS pr_status (
     ci_status TEXT DEFAULT 'unknown',
     head_branch TEXT DEFAULT '',
     state TEXT DEFAULT 'open',
+    priority INTEGER DEFAULT 0,
     last_checked DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -155,8 +156,14 @@ async def upsert_pr_status(
 async def get_all_pr_status(db_path: Path) -> list[dict]:
     async with aiosqlite.connect(db_path) as conn:
         conn.row_factory = aiosqlite.Row
-        cursor = await conn.execute("SELECT * FROM pr_status ORDER BY last_checked DESC")
+        cursor = await conn.execute("SELECT * FROM pr_status ORDER BY priority DESC, last_checked DESC")
         return [dict(row) for row in await cursor.fetchall()]
+
+
+async def update_pr_priority(db_path: Path, pr_id: int, priority: int) -> None:
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.execute("UPDATE pr_status SET priority = ? WHERE id = ?", (priority, pr_id))
+        await conn.commit()
 
 
 async def get_pr_status(db_path: Path, pr_url: str) -> dict | None:

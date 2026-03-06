@@ -25,7 +25,7 @@ from fastapi.templating import Jinja2Templates
 from config import load_config, CONFIG_DIR
 from db import init_db, log_activity, get_recent_activity
 import asyncio
-from db import get_all_pr_status, get_pending_drafts, update_draft_status
+from db import get_all_pr_status, get_pending_drafts, update_draft_status, update_pr_priority
 from db import get_standups, get_latest_standup, get_active_reminders, dismiss_reminder, snooze_reminder
 from db import get_reviews, get_digests, get_latest_digest
 from db import get_metrics_checks, get_metrics_history, get_weekly_summaries, create_metrics_check
@@ -268,6 +268,14 @@ async def api_meetings():
 @app.get("/api/gmail")
 async def api_gmail():
     return getattr(app.state, "gmail_data", {"unread_count": 0, "messages": []})
+
+
+@app.post("/api/prs/{pr_id}/priority/{priority}")
+async def set_pr_priority(pr_id: int, priority: int):
+    if priority < 0 or priority > 3:
+        return {"error": "Priority must be 0-3"}
+    await update_pr_priority(DB_PATH, pr_id, priority)
+    return {"message": "Priority updated", "pr_id": pr_id, "priority": priority}
 
 
 @app.get("/api/drafts")

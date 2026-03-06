@@ -12,13 +12,26 @@
 {% if prs %}
 <div class="card-grid">
     {% for pr in prs %}
-    <div class="card">
-        <div class="card-title">{{ pr.repo }}</div>
+    <div class="card {% if pr.priority == 3 %}pr-urgent{% elif pr.priority == 2 %}pr-high{% elif pr.priority == 1 %}pr-low{% endif %}">
+        <div class="card-title">
+            {{ pr.repo }}
+            {% if pr.priority == 3 %}<span class="priority-badge priority-urgent">URGENT</span>
+            {% elif pr.priority == 2 %}<span class="priority-badge priority-high">HIGH</span>
+            {% elif pr.priority == 1 %}<span class="priority-badge priority-low">LOW</span>
+            {% endif %}
+        </div>
         <div class="pr-title">
             <span class="ci-badge ci-{{ pr.ci_status }}"></span>
             <a href="{{ pr.pr_url }}" target="_blank">{{ pr.title }}</a>
         </div>
         <div class="card-detail">CI: {{ pr.ci_status }}{% if pr.head_branch %} · {{ pr.head_branch }}{% endif %}</div>
+
+        <div class="priority-controls">
+            <button class="btn btn-sm {% if pr.priority == 3 %}btn-active{% endif %}" hx-post="/api/prs/{{ pr.id }}/priority/3" hx-swap="none" onclick="setTimeout(()=>location.reload(),300)">Urgent</button>
+            <button class="btn btn-sm {% if pr.priority == 2 %}btn-active{% endif %}" hx-post="/api/prs/{{ pr.id }}/priority/2" hx-swap="none" onclick="setTimeout(()=>location.reload(),300)">High</button>
+            <button class="btn btn-sm {% if pr.priority == 1 %}btn-active{% endif %}" hx-post="/api/prs/{{ pr.id }}/priority/1" hx-swap="none" onclick="setTimeout(()=>location.reload(),300)">Low</button>
+            <button class="btn btn-sm {% if pr.priority == 0 %}btn-active{% endif %}" hx-post="/api/prs/{{ pr.id }}/priority/0" hx-swap="none" onclick="setTimeout(()=>location.reload(),300)">None</button>
+        </div>
 
         {% if drafts_by_pr.get(pr.pr_url) %}
         <div class="pr-drafts">
