@@ -16,6 +16,9 @@ from db import (
     create_review, get_reviews, get_reviews_for_pr,
     create_digest, get_digests, get_latest_digest,
     log_jira_automation, get_jira_automations, get_jira_automations_for_ticket,
+    create_metrics_check, get_metrics_checks, update_metrics_check_value,
+    log_metrics_history, get_metrics_history,
+    create_weekly_summary, get_weekly_summaries, get_latest_weekly_summary,
 )
 
 
@@ -237,3 +240,54 @@ def test_get_jira_automations_for_ticket(db_path):
     run(log_jira_automation(db_path, ticket_key="PROJ-456", action="created subtask"))
     automations = run(get_jira_automations_for_ticket(db_path, ticket_key="PROJ-123"))
     assert len(automations) == 2
+
+
+def test_create_and_get_metrics_checks(db_path):
+    run(init_db(db_path))
+    run(create_metrics_check(db_path, name="p99 latency", query="curl -s http://metrics/p99", threshold=500.0))
+    run(create_metrics_check(db_path, name="error rate", query="curl -s http://metrics/errors", threshold=0.01))
+    checks = run(get_metrics_checks(db_path))
+    assert len(checks) == 2
+
+
+def test_update_metrics_check_value(db_path):
+    run(init_db(db_path))
+    run(create_metrics_check(db_path, name="p99 latency", query="curl -s http://metrics/p99", threshold=500.0))
+    checks = run(get_metrics_checks(db_path))
+    run(update_metrics_check_value(db_path, check_id=checks[0]["id"], value=123.4))
+    updated = run(get_metrics_checks(db_path))
+    assert updated[0]["last_value"] == 123.4
+
+
+def test_log_and_get_metrics_history(db_path):
+    run(init_db(db_path))
+    run(create_metrics_check(db_path, name="p99", query="echo 100", threshold=500.0))
+    checks = run(get_metrics_checks(db_path))
+    check_id = checks[0]["id"]
+    run(log_metrics_history(db_path, check_id=check_id, value=100.0, alerted=False))
+    run(log_metrics_history(db_path, check_id=check_id, value=600.0, alerted=True))
+    history = run(get_metrics_history(db_path, check_id=check_id, limit=10))
+    assert len(history) == 2
+    assert any(h["alerted"] == 1 for h in history)
+
+
+def test_create_and_get_weekly_summaries(db_path):
+    run(init_db(db_path))
+    run(create_weekly_summary(db_path, week_start="2026-03-02", content="Week summary", google_doc_url="https://docs.google.com/doc/123"))
+    summaries = run(get_weekly_summaries(db_path, limit=5))
+    assert len(summaries) == 1
+    assert summaries[0]["google_doc_url"] == "https://docs.google.com/doc/123"
+
+
+def test_get_latest_weekly_summary(db_path):
+    run(init_db(db_path))
+    run(create_weekly_summary(db_path, week_start="2026-02-24", content="Last week"))
+    run(create_weekly_summary(db_path, week_start="2026-03-02", content="This week"))
+    latest = run(get_latest_weekly_summary(db_path))
+    assert latest["content"] == "This week"
+
+
+def test_get_latest_weekly_summary_empty(db_path):
+    run(init_db(db_path))
+    latest = run(get_latest_weekly_summary(db_path))
+    assert latest is None

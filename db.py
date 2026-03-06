@@ -335,3 +335,78 @@ async def get_jira_automations_for_ticket(db_path: Path, ticket_key: str) -> lis
             (ticket_key,),
         )
         return [dict(row) for row in await cursor.fetchall()]
+
+
+async def create_metrics_check(db_path: Path, name: str, query: str, threshold: float, schedule: str = "*/30 * * * *") -> int:
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.execute(
+            "INSERT INTO metrics_checks (name, query, threshold, schedule) VALUES (?, ?, ?, ?)",
+            (name, query, threshold, schedule),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_metrics_checks(db_path: Path) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM metrics_checks ORDER BY name")
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def update_metrics_check_value(db_path: Path, check_id: int, value: float) -> None:
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.execute(
+            "UPDATE metrics_checks SET last_value = ?, last_checked = CURRENT_TIMESTAMP WHERE id = ?",
+            (value, check_id),
+        )
+        await conn.commit()
+
+
+async def log_metrics_history(db_path: Path, check_id: int, value: float, alerted: bool = False) -> int:
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.execute(
+            "INSERT INTO metrics_history (check_id, value, alerted) VALUES (?, ?, ?)",
+            (check_id, value, 1 if alerted else 0),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_metrics_history(db_path: Path, check_id: int, limit: int = 50) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM metrics_history WHERE check_id = ? ORDER BY timestamp DESC LIMIT ?",
+            (check_id, limit),
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def create_weekly_summary(db_path: Path, week_start: str, content: str, google_doc_url: str = "") -> int:
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.execute(
+            "INSERT INTO weekly_summaries (week_start, content, google_doc_url) VALUES (?, ?, ?)",
+            (week_start, content, google_doc_url),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_weekly_summaries(db_path: Path, limit: int = 10) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM weekly_summaries ORDER BY week_start DESC LIMIT ?", (limit,)
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_latest_weekly_summary(db_path: Path) -> dict | None:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM weekly_summaries ORDER BY week_start DESC LIMIT 1"
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
