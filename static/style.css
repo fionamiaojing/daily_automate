@@ -516,6 +516,31 @@ button:disabled {
     margin-top: 0.25rem;
 }
 
+.rsvp-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    font-family: var(--font);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+.rsvp-accepted { background: #dcfce7; color: #166534; }
+.rsvp-declined { background: #fee2e2; color: #991b1b; }
+.rsvp-tentative { background: #fef3c7; color: #92400e; }
+.rsvp-needsAction { background: #e2e8f0; color: #475569; }
+
+@media (prefers-color-scheme: dark) {
+    .rsvp-accepted { background: #14532d; color: #86efac; }
+    .rsvp-declined { background: #450a0a; color: #fca5a5; }
+    .rsvp-tentative { background: #451a03; color: #fbbf24; }
+    .rsvp-needsAction { background: #334155; color: #94a3b8; }
+}
+
 .meet-link {
     display: inline-flex;
     align-items: center;

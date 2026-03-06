@@ -38,6 +38,13 @@ def fetch_todays_events() -> list[dict]:
         end = item["end"].get("dateTime", "")
         attendees = [a.get("email", "") for a in item.get("attendees", [])]
 
+        # Extract my RSVP status (accepted/declined/tentative/needsAction)
+        my_rsvp = ""
+        for a in item.get("attendees", []):
+            if a.get("self"):
+                my_rsvp = a.get("responseStatus", "")
+                break
+
         # Extract Google Meet link
         meet_link = ""
         if item.get("hangoutLink"):
@@ -55,7 +62,7 @@ def fetch_todays_events() -> list[dict]:
             "location": item.get("location", ""),
             "meet_link": meet_link,
             "attendees": attendees,
-            "status": item.get("status", ""),
+            "my_rsvp": my_rsvp,
             "html_link": item.get("htmlLink", ""),
         })
 

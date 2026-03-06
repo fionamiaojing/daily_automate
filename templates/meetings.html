@@ -13,7 +13,12 @@
     <div class="meetings-list">
         {% for m in meetings %}
         <div class="card meeting-card">
-            <div class="meeting-time">{{ format_time(m.start) }} — {{ format_time(m.end) }}</div>
+            <div class="meeting-time">
+                {{ format_time(m.start) }} — {{ format_time(m.end) }}
+                {% if m.my_rsvp %}
+                <span class="rsvp-badge rsvp-{{ m.my_rsvp }}">{{ m.my_rsvp | replace("needsAction", "pending") }}</span>
+                {% endif %}
+            </div>
             <div class="meeting-title">
                 {% if m.html_link %}
                     <a href="{{ m.html_link }}" target="_blank">{{ m.summary }}</a>
