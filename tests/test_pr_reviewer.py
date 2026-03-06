@@ -15,7 +15,7 @@ def run(coro):
 
 SAMPLE_REVIEW_PRS = [
     {"url": "https://github.com/org/repo/pull/5", "title": "Add feature", "number": 5,
-     "repository": {"nameWithOwner": "org/repo"}, "headRefName": "feature-branch"},
+     "repository": {"nameWithOwner": "org/repo", "name": "repo"}},
 ]
 
 

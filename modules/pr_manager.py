@@ -33,10 +33,10 @@ async def _run_gh(*args: str) -> str:
 
 
 async def fetch_my_open_prs() -> list[dict]:
-    """Fetch all open PRs authored by the current user."""
+    """Fetch all open PRs authored by the current user across all repos."""
     output = await _run_gh(
-        "pr", "list", "--author", "@me", "--state", "open",
-        "--json", "url,number,title,headRefName,repository",
+        "search", "prs", "--author", "@me", "--state", "open",
+        "--json", "url,number,title,repository",
     )
     return json.loads(output)
 

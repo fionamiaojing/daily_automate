@@ -24,8 +24,7 @@ SAMPLE_PRS = [
         "url": "https://github.com/org/repo/pull/1",
         "number": 1,
         "title": "Fix bug",
-        "headRefName": "fix-bug",
-        "repository": {"nameWithOwner": "org/repo"},
+        "repository": {"nameWithOwner": "org/repo", "name": "repo"},
     }
 ]
 
