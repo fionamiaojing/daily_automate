@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS pr_status (
     repo TEXT NOT NULL,
     title TEXT DEFAULT '',
     ci_status TEXT DEFAULT 'unknown',
+    head_branch TEXT DEFAULT '',
+    state TEXT DEFAULT 'open',
     last_checked DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -130,16 +132,21 @@ async def get_recent_activity(db_path: Path, limit: int = 20) -> list[dict]:
         return [dict(row) for row in rows]
 
 
-async def upsert_pr_status(db_path: Path, pr_url: str, repo: str, title: str, ci_status: str) -> None:
+async def upsert_pr_status(
+    db_path: Path, pr_url: str, repo: str, title: str, ci_status: str,
+    head_branch: str = "", state: str = "open",
+) -> None:
     async with aiosqlite.connect(db_path) as conn:
         await conn.execute(
-            """INSERT INTO pr_status (pr_url, repo, title, ci_status, last_checked)
-               VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """INSERT INTO pr_status (pr_url, repo, title, ci_status, head_branch, state, last_checked)
+               VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                ON CONFLICT(pr_url) DO UPDATE SET
                  ci_status = excluded.ci_status,
                  title = excluded.title,
+                 head_branch = excluded.head_branch,
+                 state = excluded.state,
                  last_checked = CURRENT_TIMESTAMP""",
-            (pr_url, repo, title, ci_status),
+            (pr_url, repo, title, ci_status, head_branch, state),
         )
         await conn.commit()
 

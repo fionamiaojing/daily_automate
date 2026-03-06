@@ -38,11 +38,16 @@ async def link_prs_to_tickets(db_path: Path, projects: list[str]) -> list[dict]:
     for pr in prs:
         title = pr.get("title", "")
         pr_url = pr.get("pr_url", "")
+        head_branch = pr.get("head_branch", "")
 
-        # Try to extract ticket key from title
-        ticket_key = extract_ticket_key(title)
+        # Try to extract ticket key from branch name first (most reliable)
+        ticket_key = extract_ticket_key(head_branch) if head_branch else None
 
-        # Also try from PR URL path
+        # Fall back to title
+        if not ticket_key:
+            ticket_key = extract_ticket_key(title)
+
+        # Last resort: URL
         if not ticket_key:
             ticket_key = extract_ticket_key(pr_url)
 
@@ -52,6 +57,7 @@ async def link_prs_to_tickets(db_path: Path, projects: list[str]) -> list[dict]:
                 "ticket_key": ticket_key,
                 "title": title,
                 "ci_status": pr.get("ci_status", "unknown"),
+                "state": pr.get("state", "open"),
             })
 
     return linked
@@ -88,7 +94,7 @@ async def run_jira_automation(db_path: Path, config: dict) -> None:
 
         # Auto-transition if enabled
         if auto_transition:
-            pr_state = "open"
+            pr_state = item.get("state", "open")
             target = should_transition(pr_state, current_status)
 
             if target:

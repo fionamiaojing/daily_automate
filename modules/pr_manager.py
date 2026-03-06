@@ -41,25 +41,36 @@ async def fetch_my_open_prs() -> list[dict]:
     return json.loads(output)
 
 
-async def fetch_pr_check_status(repo: str, pr_number: int) -> str:
-    """Fetch CI check status for a PR. Returns 'success', 'failure', or 'pending'."""
+async def fetch_pr_details(repo: str, pr_number: int) -> dict:
+    """Fetch CI check status, branch name, and state for a PR.
+
+    Returns dict with keys: ci_status, head_branch, state.
+    """
     output = await _run_gh(
         "pr", "view", str(pr_number), "--repo", repo,
-        "--json", "statusCheckRollup",
+        "--json", "statusCheckRollup,headRefName,state",
     )
     data = json.loads(output)
+
+    # Parse CI status
     checks = data.get("statusCheckRollup", [])
     if not checks:
-        return "pending"
+        ci_status = "pending"
+    elif any(c.get("conclusion") == "FAILURE" for c in checks):
+        ci_status = "failure"
+    elif any(c.get("status") != "COMPLETED" for c in checks):
+        ci_status = "pending"
+    else:
+        ci_status = "success"
 
-    has_failure = any(c.get("conclusion") == "FAILURE" for c in checks)
-    has_pending = any(c.get("status") != "COMPLETED" for c in checks)
+    # state is "OPEN", "CLOSED", or "MERGED"
+    raw_state = data.get("state", "OPEN").lower()
 
-    if has_failure:
-        return "failure"
-    if has_pending:
-        return "pending"
-    return "success"
+    return {
+        "ci_status": ci_status,
+        "head_branch": data.get("headRefName", ""),
+        "state": raw_state,
+    }
 
 
 async def fetch_pr_comments(repo: str, pr_number: int) -> list[dict]:
@@ -117,12 +128,19 @@ async def poll_prs(
         pr_number = pr["number"]
         title = pr["title"]
 
-        # Check CI status
-        ci_status = await fetch_pr_check_status(repo, pr_number)
+        # Fetch PR details (CI, branch, state)
+        details = await fetch_pr_details(repo, pr_number)
+        ci_status = details["ci_status"]
+        head_branch = details["head_branch"]
+        pr_state = details["state"]
+
         old = await get_pr_status(db_path, pr_url)
         old_status = old["ci_status"] if old else None
 
-        await upsert_pr_status(db_path, pr_url=pr_url, repo=repo, title=title, ci_status=ci_status)
+        await upsert_pr_status(
+            db_path, pr_url=pr_url, repo=repo, title=title,
+            ci_status=ci_status, head_branch=head_branch, state=pr_state,
+        )
 
         # Notify on status change
         if old_status and old_status != ci_status:

@@ -10,7 +10,7 @@ import pytest
 
 from modules.pr_manager import (
     fetch_my_open_prs,
-    fetch_pr_check_status,
+    fetch_pr_details,
     fetch_pr_comments,
 )
 
@@ -39,34 +39,37 @@ def test_fetch_my_open_prs(mock_gh):
 
 
 @patch("modules.pr_manager._run_gh")
-def test_fetch_pr_check_status_success(mock_gh):
-    checks = {"statusCheckRollup": [
+def test_fetch_pr_details_success(mock_gh):
+    data = {"statusCheckRollup": [
         {"name": "build", "status": "COMPLETED", "conclusion": "SUCCESS"},
         {"name": "test", "status": "COMPLETED", "conclusion": "SUCCESS"},
-    ]}
-    mock_gh.return_value = json.dumps(checks)
-    status = run(fetch_pr_check_status("org/repo", 1))
-    assert status == "success"
+    ], "headRefName": "fiona/PACHI-123-fix", "state": "OPEN"}
+    mock_gh.return_value = json.dumps(data)
+    details = run(fetch_pr_details("org/repo", 1))
+    assert details["ci_status"] == "success"
+    assert details["head_branch"] == "fiona/PACHI-123-fix"
+    assert details["state"] == "open"
 
 
 @patch("modules.pr_manager._run_gh")
-def test_fetch_pr_check_status_failure(mock_gh):
-    checks = {"statusCheckRollup": [
+def test_fetch_pr_details_failure(mock_gh):
+    data = {"statusCheckRollup": [
         {"name": "build", "status": "COMPLETED", "conclusion": "FAILURE"},
-    ]}
-    mock_gh.return_value = json.dumps(checks)
-    status = run(fetch_pr_check_status("org/repo", 1))
-    assert status == "failure"
+    ], "headRefName": "fix-bug", "state": "OPEN"}
+    mock_gh.return_value = json.dumps(data)
+    details = run(fetch_pr_details("org/repo", 1))
+    assert details["ci_status"] == "failure"
 
 
 @patch("modules.pr_manager._run_gh")
-def test_fetch_pr_check_status_pending(mock_gh):
-    checks = {"statusCheckRollup": [
-        {"name": "build", "status": "IN_PROGRESS", "conclusion": None},
-    ]}
-    mock_gh.return_value = json.dumps(checks)
-    status = run(fetch_pr_check_status("org/repo", 1))
-    assert status == "pending"
+def test_fetch_pr_details_merged(mock_gh):
+    data = {"statusCheckRollup": [
+        {"name": "build", "status": "COMPLETED", "conclusion": "SUCCESS"},
+    ], "headRefName": "feature", "state": "MERGED"}
+    mock_gh.return_value = json.dumps(data)
+    details = run(fetch_pr_details("org/repo", 1))
+    assert details["ci_status"] == "success"
+    assert details["state"] == "merged"
 
 
 @patch("modules.pr_manager._run_gh")

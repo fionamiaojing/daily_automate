@@ -33,7 +33,7 @@ def test_should_transition_no_change():
     assert should_transition(pr_state="open", current_jira_status="In Progress") is None
 
 
-def test_link_prs_to_tickets(db_path):
+def test_link_prs_to_tickets_from_title(db_path):
     run(init_db(db_path))
     run(upsert_pr_status(db_path, pr_url="https://github.com/org/repo/pull/1", repo="org/repo", title="PROJ-123 Fix bug", ci_status="success"))
     run(upsert_pr_status(db_path, pr_url="https://github.com/org/repo/pull/2", repo="org/repo", title="no ticket here", ci_status="success"))
@@ -41,3 +41,14 @@ def test_link_prs_to_tickets(db_path):
     linked = run(link_prs_to_tickets(db_path, projects=["PROJ"]))
     assert len(linked) == 1
     assert linked[0]["ticket_key"] == "PROJ-123"
+
+
+def test_link_prs_to_tickets_from_branch(db_path):
+    run(init_db(db_path))
+    run(upsert_pr_status(db_path, pr_url="https://github.com/org/repo/pull/3", repo="org/repo",
+                         title="Fix the widget", ci_status="success", head_branch="fiona/PROJ-456-fix-widget", state="open"))
+
+    linked = run(link_prs_to_tickets(db_path, projects=["PROJ"]))
+    assert len(linked) == 1
+    assert linked[0]["ticket_key"] == "PROJ-456"
+    assert linked[0]["state"] == "open"
