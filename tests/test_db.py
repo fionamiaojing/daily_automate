@@ -15,6 +15,7 @@ from db import (
     create_reminder, get_active_reminders, dismiss_reminder, snooze_reminder,
     create_review, get_reviews, get_reviews_for_pr,
     create_digest, get_digests, get_latest_digest,
+    log_jira_automation, get_jira_automations, get_jira_automations_for_ticket,
 )
 
 
@@ -219,3 +220,20 @@ def test_get_latest_digest_empty(db_path):
     run(init_db(db_path))
     latest = run(get_latest_digest(db_path))
     assert latest is None
+
+
+def test_log_and_get_jira_automations(db_path):
+    run(init_db(db_path))
+    run(log_jira_automation(db_path, ticket_key="PROJ-123", action="transitioned to In Progress"))
+    run(log_jira_automation(db_path, ticket_key="PROJ-456", action="transitioned to Done"))
+    automations = run(get_jira_automations(db_path, limit=10))
+    assert len(automations) == 2
+
+
+def test_get_jira_automations_for_ticket(db_path):
+    run(init_db(db_path))
+    run(log_jira_automation(db_path, ticket_key="PROJ-123", action="transitioned to In Progress"))
+    run(log_jira_automation(db_path, ticket_key="PROJ-123", action="transitioned to Done"))
+    run(log_jira_automation(db_path, ticket_key="PROJ-456", action="created subtask"))
+    automations = run(get_jira_automations_for_ticket(db_path, ticket_key="PROJ-123"))
+    assert len(automations) == 2

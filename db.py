@@ -306,3 +306,32 @@ async def get_latest_digest(db_path: Path) -> dict | None:
         )
         row = await cursor.fetchone()
         return dict(row) if row else None
+
+
+async def log_jira_automation(db_path: Path, ticket_key: str, action: str) -> int:
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.execute(
+            "INSERT INTO jira_automations (ticket_key, action) VALUES (?, ?)",
+            (ticket_key, action),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_jira_automations(db_path: Path, limit: int = 20) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM jira_automations ORDER BY timestamp DESC LIMIT ?", (limit,)
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_jira_automations_for_ticket(db_path: Path, ticket_key: str) -> list[dict]:
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM jira_automations WHERE ticket_key = ? ORDER BY timestamp DESC",
+            (ticket_key,),
+        )
+        return [dict(row) for row in await cursor.fetchall()]
