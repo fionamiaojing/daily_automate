@@ -29,6 +29,7 @@ from db import get_all_pr_status, get_pending_drafts, update_draft_status
 from db import get_standups, get_latest_standup, get_active_reminders, dismiss_reminder, snooze_reminder
 from db import get_reviews, get_digests, get_latest_digest
 from db import get_jira_automations
+from db import get_metrics_checks, get_metrics_history, get_weekly_summaries, create_metrics_check
 from modules.pr_manager import poll_prs
 from modules.notifier import notify
 from modules.standup import generate_standup
@@ -36,6 +37,8 @@ from modules.reminders import morning_summary, periodic_nudge
 from modules.pr_reviewer import review_prs
 from modules.slack_digest import generate_digest
 from modules.jira_automation import run_jira_automation
+from modules.metrics import run_metrics_checks
+from modules.weekly import generate_weekly_summary
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ---------------------------------------------------------------------------
@@ -140,6 +143,20 @@ async def lifespan(app: FastAPI):
     app.state.jira_job = _jira_job
     scheduler.add_job(_jira_job, "interval", minutes=30, id="jira_poll")
 
+    async def _metrics_job():
+        config = load_config()
+        await run_metrics_checks(DB_PATH, config)
+
+    async def _weekly_job():
+        config = load_config()
+        await generate_weekly_summary(DB_PATH, config)
+
+    app.state.metrics_job = _metrics_job
+    app.state.weekly_job = _weekly_job
+
+    scheduler.add_job(_metrics_job, "interval", minutes=30, id="metrics")
+    scheduler.add_job(_weekly_job, "cron", hour=16, minute=0, day_of_week="fri", id="weekly_summary")
+
     scheduler.start()
     app.state.scheduler = scheduler
 
@@ -217,6 +234,10 @@ async def trigger(module: str):
         asyncio.create_task(app.state.digest_job())
     elif module == "jira" and hasattr(app.state, "jira_job"):
         asyncio.create_task(app.state.jira_job())
+    elif module == "metrics" and hasattr(app.state, "metrics_job"):
+        asyncio.create_task(app.state.metrics_job())
+    elif module == "weekly" and hasattr(app.state, "weekly_job"):
+        asyncio.create_task(app.state.weekly_job())
     return {"message": f"{module} triggered", "status": "queued"}
 
 
@@ -288,6 +309,35 @@ async def api_digests():
 @app.get("/api/jira")
 async def api_jira():
     return await get_jira_automations(DB_PATH, limit=50)
+
+
+@app.get("/api/metrics")
+async def api_metrics():
+    checks = await get_metrics_checks(DB_PATH)
+    return checks
+
+
+@app.get("/api/metrics/{check_id}/history")
+async def api_metrics_history(check_id: int):
+    return await get_metrics_history(DB_PATH, check_id=check_id, limit=50)
+
+
+@app.post("/api/metrics/add")
+async def api_add_metrics_check(request: Request):
+    data = await request.json()
+    check_id = await create_metrics_check(
+        DB_PATH,
+        name=data["name"],
+        query=data["query"],
+        threshold=float(data["threshold"]),
+    )
+    await log_activity(DB_PATH, module="metrics", action="check_added", detail=f"Added check: {data['name']}")
+    return {"id": check_id, "status": "created"}
+
+
+@app.get("/api/weekly")
+async def api_weekly():
+    return await get_weekly_summaries(DB_PATH, limit=10)
 
 
 @app.post("/api/reminders/{reminder_id}/dismiss")
@@ -373,7 +423,8 @@ async def jira_page(request: Request):
 
 @app.get("/metrics", response_class=HTMLResponse)
 async def metrics_page(request: Request):
-    return _render(request, "placeholder.html", title="Metrics", description="Metrics checks coming in Phase 6")
+    checks = await get_metrics_checks(DB_PATH)
+    return _render(request, "metrics.html", checks=checks)
 
 
 @app.get("/reminders", response_class=HTMLResponse)
@@ -384,7 +435,8 @@ async def reminders_page(request: Request):
 
 @app.get("/weekly", response_class=HTMLResponse)
 async def weekly_page(request: Request):
-    return _render(request, "placeholder.html", title="Weekly", description="Weekly summary coming in Phase 6")
+    summaries = await get_weekly_summaries(DB_PATH, limit=10)
+    return _render(request, "weekly.html", summaries=summaries)
 
 
 @app.get("/config", response_class=HTMLResponse)
