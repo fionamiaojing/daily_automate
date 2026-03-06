@@ -1,0 +1,19 @@
+You are generating a daily standup update. Use a casual, conversational tone — like talking to a teammate.
+
+Here is the raw data from the last 24 hours:
+
+## Git Commits
+{commits}
+
+## Open PRs
+{prs}
+
+## JIRA Activity
+{jira}
+
+Generate a standup with these sections:
+- **Yesterday**: What was accomplished (based on commits and PRs merged)
+- **Today**: What's in progress (based on open PRs and JIRA tickets)
+- **Blockers**: Any issues (based on CI failures or stale PRs)
+
+Keep it concise — 3-5 bullet points total. No headers, just bullets.
