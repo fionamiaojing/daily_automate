@@ -26,8 +26,11 @@ from config import load_config, CONFIG_DIR
 from db import init_db, log_activity, get_recent_activity
 import asyncio
 from db import get_all_pr_status, get_pending_drafts, update_draft_status
+from db import get_standups, get_latest_standup, get_active_reminders, dismiss_reminder, snooze_reminder
 from modules.pr_manager import poll_prs
 from modules.notifier import notify
+from modules.standup import generate_standup
+from modules.reminders import morning_summary, periodic_nudge
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ---------------------------------------------------------------------------
@@ -90,6 +93,26 @@ async def lifespan(app: FastAPI):
 
     app.state.poll_prs_job = _poll_prs_job
     scheduler.add_job(_poll_prs_job, "interval", minutes=5, id="pr_poll")
+
+    async def _standup_job():
+        config = load_config()
+        await generate_standup(DB_PATH, config)
+
+    async def _morning_job():
+        config = load_config()
+        await morning_summary(DB_PATH, config)
+
+    async def _periodic_job():
+        config = load_config()
+        await periodic_nudge(DB_PATH, config)
+
+    app.state.standup_job = _standup_job
+    app.state.morning_job = _morning_job
+    app.state.periodic_job = _periodic_job
+
+    scheduler.add_job(_standup_job, "cron", hour=9, minute=0, day_of_week="mon-fri", id="standup")
+    scheduler.add_job(_morning_job, "cron", hour=7, minute=0, day_of_week="mon-fri", id="morning_reminder")
+    scheduler.add_job(_periodic_job, "interval", hours=2, id="periodic_reminder")
     scheduler.start()
     app.state.scheduler = scheduler
 
@@ -155,7 +178,11 @@ async def activity_html(request: Request):
 @app.post("/api/trigger/{module}")
 async def trigger(module: str):
     await log_activity(DB_PATH, module=module, action="triggered", detail="Manual trigger from UI")
-    if module == "pr_manager" and hasattr(app.state, "poll_prs_job"):
+    if module == "standup" and hasattr(app.state, "standup_job"):
+        asyncio.create_task(app.state.standup_job())
+    elif module == "reminders" and hasattr(app.state, "morning_job"):
+        asyncio.create_task(app.state.morning_job())
+    elif module == "pr_manager" and hasattr(app.state, "poll_prs_job"):
         asyncio.create_task(app.state.poll_prs_job())
     return {"message": f"{module} triggered", "status": "queued"}
 
@@ -203,6 +230,32 @@ async def reject_draft(draft_id: int):
     await update_draft_status(DB_PATH, draft_id=draft_id, status="rejected")
     await log_activity(DB_PATH, module="pr_manager", action="draft_rejected", detail=f"Draft #{draft_id} rejected")
     return HTMLResponse(f'<div class="card draft-card" style="opacity: 0.5;"><div class="card-detail">Draft #{draft_id} rejected</div></div>')
+
+
+@app.get("/api/standups")
+async def api_standups():
+    return await get_standups(DB_PATH, limit=10)
+
+
+@app.get("/api/reminders")
+async def api_reminders():
+    return await get_active_reminders(DB_PATH)
+
+
+@app.post("/api/reminders/{reminder_id}/dismiss")
+async def api_dismiss_reminder(reminder_id: int):
+    await dismiss_reminder(DB_PATH, reminder_id=reminder_id)
+    await log_activity(DB_PATH, module="reminders", action="dismissed", detail=f"Reminder #{reminder_id}")
+    return HTMLResponse(f'<div class="card" style="opacity: 0.5;"><div class="card-detail">Dismissed</div></div>')
+
+
+@app.post("/api/reminders/{reminder_id}/snooze")
+async def api_snooze_reminder(reminder_id: int):
+    from datetime import datetime, timedelta
+    until = (datetime.now() + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+    await snooze_reminder(DB_PATH, reminder_id=reminder_id, until=until)
+    await log_activity(DB_PATH, module="reminders", action="snoozed", detail=f"Reminder #{reminder_id} until {until}")
+    return HTMLResponse(f'<div class="card" style="opacity: 0.7;"><div class="card-detail">Snoozed until {until}</div></div>')
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +306,8 @@ async def reviews_page(request: Request):
 
 @app.get("/standup", response_class=HTMLResponse)
 async def standup_page(request: Request):
-    return _render(request, "placeholder.html", title="Standup", description="Standup generation coming in Phase 3")
+    standups = await get_standups(DB_PATH, limit=10)
+    return _render(request, "standup.html", standups=standups)
 
 
 @app.get("/digest", response_class=HTMLResponse)
@@ -273,7 +327,8 @@ async def metrics_page(request: Request):
 
 @app.get("/reminders", response_class=HTMLResponse)
 async def reminders_page(request: Request):
-    return _render(request, "placeholder.html", title="Reminders", description="Reminders coming in Phase 3")
+    reminders = await get_active_reminders(DB_PATH)
+    return _render(request, "reminders.html", reminders=reminders)
 
 
 @app.get("/weekly", response_class=HTMLResponse)
