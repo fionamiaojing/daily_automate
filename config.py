@@ -25,7 +25,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "slack": {
         "bot_token": "",
         "default_channel": "",
-        "digest_channels": [],
+        "digest_channels": [],  # list of {name: "#channel", id: "C12345"} dicts
     },
     "jira": {
         "projects": [],

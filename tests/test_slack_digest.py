@@ -13,9 +13,13 @@ def run(coro):
 
 
 def test_build_digest_prompt_with_channels():
-    prompt = build_digest_prompt(channels=["#eng-feed", "#ai-news"])
-    assert "#eng-feed" in prompt
-    assert "#ai-news" in prompt
+    channels = [
+        {"name": "#ai-adoption", "id": "C05946FLL85"},
+        {"name": "#ai-dev-tooling", "id": "C08D0TKLU3V"},
+    ]
+    prompt = build_digest_prompt(channels=channels)
+    assert "#ai-adoption" in prompt
+    assert "C05946FLL85" in prompt
     assert "digest" in prompt.lower()
 
 
