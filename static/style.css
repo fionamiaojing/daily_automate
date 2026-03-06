@@ -480,3 +480,84 @@ button:disabled {
 .doc-link:hover {
     text-decoration: underline;
 }
+
+/* ----- Meetings ----- */
+.meetings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.meeting-time {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    font-family: var(--mono);
+    color: var(--accent);
+    margin-bottom: 0.25rem;
+}
+
+.meeting-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.meeting-title a {
+    color: var(--text);
+}
+
+.meeting-title a:hover {
+    color: var(--accent);
+}
+
+.meeting-attendees {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.meet-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--accent);
+    margin-top: 0.25rem;
+}
+
+.meet-link:hover {
+    text-decoration: underline;
+}
+
+/* ----- Gmail ----- */
+.email-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.email-card {
+    padding: 1rem 1.25rem;
+}
+
+.email-from {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.125rem;
+}
+
+.email-subject {
+    font-size: 0.875rem;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+}
+
+.email-snippet {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

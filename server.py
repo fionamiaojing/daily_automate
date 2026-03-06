@@ -37,6 +37,8 @@ from modules.pr_reviewer import review_prs
 from modules.slack_digest import generate_digest
 from modules.metrics import run_metrics_checks
 from modules.weekly import generate_weekly_summary
+from modules.meetings import poll_meetings, format_time, meetings_summary
+from modules.gmail import poll_gmail
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ---------------------------------------------------------------------------
@@ -142,11 +144,28 @@ async def lifespan(app: FastAPI):
         config = load_config()
         await generate_weekly_summary(DB_PATH, config)
 
+    async def _meetings_job():
+        config = load_config()
+        meetings = await poll_meetings(DB_PATH, config)
+        app.state.meetings = meetings
+
+    async def _gmail_job():
+        config = load_config()
+        data = await poll_gmail(DB_PATH, config)
+        app.state.gmail_data = data
+
     app.state.metrics_job = _metrics_job
     app.state.weekly_job = _weekly_job
+    app.state.meetings_job = _meetings_job
+    app.state.gmail_job = _gmail_job
+    # In-memory cache for latest data (refreshed by jobs)
+    app.state.meetings = []
+    app.state.gmail_data = {"unread_count": 0, "messages": []}
 
     scheduler.add_job(_metrics_job, "interval", minutes=30, id="metrics")
     scheduler.add_job(_weekly_job, "cron", hour=16, minute=0, day_of_week="fri", id="weekly_summary")
+    scheduler.add_job(_meetings_job, "cron", hour=7, minute=30, day_of_week="mon-fri", id="meetings")
+    scheduler.add_job(_gmail_job, "interval", minutes=30, id="gmail")
 
     scheduler.start()
     app.state.scheduler = scheduler
@@ -161,6 +180,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="daily_automate", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates.env.globals["format_time"] = format_time
 
 # ---------------------------------------------------------------------------
 # API routes
@@ -227,6 +247,10 @@ async def trigger(module: str):
         asyncio.create_task(app.state.metrics_job())
     elif module == "weekly" and hasattr(app.state, "weekly_job"):
         asyncio.create_task(app.state.weekly_job())
+    elif module == "meetings" and hasattr(app.state, "meetings_job"):
+        asyncio.create_task(app.state.meetings_job())
+    elif module == "gmail" and hasattr(app.state, "gmail_job"):
+        asyncio.create_task(app.state.gmail_job())
     return {"message": f"{module} triggered", "status": "queued"}
 
 
@@ -234,6 +258,16 @@ async def trigger(module: str):
 async def api_prs():
     prs = await get_all_pr_status(DB_PATH)
     return prs
+
+
+@app.get("/api/meetings")
+async def api_meetings():
+    return getattr(app.state, "meetings", [])
+
+
+@app.get("/api/gmail")
+async def api_gmail():
+    return getattr(app.state, "gmail_data", {"unread_count": 0, "messages": []})
 
 
 @app.get("/api/drafts")
@@ -353,6 +387,8 @@ async def api_snooze_reminder(reminder_id: int):
 
 PAGES = [
     ("Dashboard", "/"),
+    ("Meetings", "/meetings"),
+    ("Gmail", "/gmail"),
     ("PRs", "/prs"),
     ("Reviews", "/reviews"),
     ("Standup", "/standup"),
@@ -378,6 +414,18 @@ async def dashboard(request: Request):
     prs = await get_all_pr_status(DB_PATH)
     drafts = await get_pending_drafts(DB_PATH)
     return _render(request, "dashboard.html", activity=act, prs_open=len(prs), drafts_pending=len(drafts))
+
+
+@app.get("/meetings", response_class=HTMLResponse)
+async def meetings_page(request: Request):
+    meetings = getattr(app.state, "meetings", [])
+    return _render(request, "meetings.html", meetings=meetings)
+
+
+@app.get("/gmail", response_class=HTMLResponse)
+async def gmail_page(request: Request):
+    gmail_data = getattr(app.state, "gmail_data", {"unread_count": 0, "messages": []})
+    return _render(request, "gmail.html", gmail_data=gmail_data)
 
 
 @app.get("/prs", response_class=HTMLResponse)

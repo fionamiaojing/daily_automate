@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Gmail — daily_automate{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Gmail</h1>
+    <p>Unread emails in your inbox</p>
+</div>
+<div class="btn-group">
+    <button hx-post="/api/trigger/gmail" hx-swap="none">Refresh Inbox</button>
+</div>
+
+{% if gmail_data and gmail_data.unread_count > 0 %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">Inbox</div>
+        <div class="card-value">{{ gmail_data.unread_count }} unread</div>
+    </div>
+
+    <div class="section-title">Recent Unread</div>
+    <div class="email-list">
+        {% for msg in gmail_data.messages %}
+        <div class="card email-card">
+            <div class="email-from">{{ msg.from }}</div>
+            <div class="email-subject">{{ msg.subject }}</div>
+            <div class="email-snippet">{{ msg.snippet }}</div>
+        </div>
+        {% endfor %}
+    </div>
+{% elif gmail_data %}
+    <div class="placeholder" style="min-height: 200px;">
+        <p>Inbox zero! No unread emails.</p>
+    </div>
+{% else %}
+    <div class="placeholder" style="min-height: 200px;">
+        <p>No email data yet. Click "Refresh Inbox" to fetch.</p>
+    </div>
+{% endif %}
+{% endblock %}

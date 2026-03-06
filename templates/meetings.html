@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Meetings — daily_automate{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Today's Meetings</h1>
+    <p>Your calendar for today</p>
+</div>
+<div class="btn-group">
+    <button hx-post="/api/trigger/meetings" hx-swap="none">Refresh Meetings</button>
+</div>
+
+{% if meetings %}
+    <div class="meetings-list">
+        {% for m in meetings %}
+        <div class="card meeting-card">
+            <div class="meeting-time">{{ format_time(m.start) }} — {{ format_time(m.end) }}</div>
+            <div class="meeting-title">
+                {% if m.html_link %}
+                    <a href="{{ m.html_link }}" target="_blank">{{ m.summary }}</a>
+                {% else %}
+                    {{ m.summary }}
+                {% endif %}
+            </div>
+            {% if m.location %}
+            <div class="card-detail">{{ m.location }}</div>
+            {% endif %}
+            {% if m.meet_link %}
+            <a class="meet-link" href="{{ m.meet_link }}" target="_blank">Join Meet</a>
+            {% endif %}
+            {% if m.attendees %}
+            <div class="meeting-attendees">{{ m.attendees | length }} attendee{{ 's' if m.attendees | length != 1 else '' }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="placeholder" style="min-height: 200px;">
+        <p>No meetings today. Click "Refresh Meetings" to fetch your calendar.</p>
+    </div>
+{% endif %}
+{% endblock %}
