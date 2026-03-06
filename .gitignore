@@ -1,0 +1,8 @@
+config.yaml
+*.db
+*.log
+*.pid
+__pycache__/
+.venv/
+.env
+.claude/
