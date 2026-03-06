@@ -27,10 +27,13 @@ from db import init_db, log_activity, get_recent_activity
 import asyncio
 from db import get_all_pr_status, get_pending_drafts, update_draft_status
 from db import get_standups, get_latest_standup, get_active_reminders, dismiss_reminder, snooze_reminder
+from db import get_reviews, get_digests, get_latest_digest
 from modules.pr_manager import poll_prs
 from modules.notifier import notify
 from modules.standup import generate_standup
 from modules.reminders import morning_summary, periodic_nudge
+from modules.pr_reviewer import review_prs
+from modules.slack_digest import generate_digest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ---------------------------------------------------------------------------
@@ -113,6 +116,20 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(_standup_job, "cron", hour=9, minute=0, day_of_week="mon-fri", id="standup")
     scheduler.add_job(_morning_job, "cron", hour=7, minute=0, day_of_week="mon-fri", id="morning_reminder")
     scheduler.add_job(_periodic_job, "interval", hours=2, id="periodic_reminder")
+
+    async def _review_prs_job():
+        config = load_config()
+        await review_prs(DB_PATH, config)
+
+    async def _digest_job():
+        config = load_config()
+        await generate_digest(DB_PATH, config)
+
+    app.state.review_prs_job = _review_prs_job
+    app.state.digest_job = _digest_job
+
+    scheduler.add_job(_review_prs_job, "interval", hours=1, id="pr_review")
+    scheduler.add_job(_digest_job, "cron", hour=8, minute=0, day_of_week="mon-fri", id="slack_digest")
     scheduler.start()
     app.state.scheduler = scheduler
 
@@ -184,6 +201,10 @@ async def trigger(module: str):
         asyncio.create_task(app.state.morning_job())
     elif module == "pr_manager" and hasattr(app.state, "poll_prs_job"):
         asyncio.create_task(app.state.poll_prs_job())
+    elif module == "review_prs" and hasattr(app.state, "review_prs_job"):
+        asyncio.create_task(app.state.review_prs_job())
+    elif module == "digest" and hasattr(app.state, "digest_job"):
+        asyncio.create_task(app.state.digest_job())
     return {"message": f"{module} triggered", "status": "queued"}
 
 
@@ -240,6 +261,16 @@ async def api_standups():
 @app.get("/api/reminders")
 async def api_reminders():
     return await get_active_reminders(DB_PATH)
+
+
+@app.get("/api/reviews")
+async def api_reviews():
+    return await get_reviews(DB_PATH, limit=20)
+
+
+@app.get("/api/digests")
+async def api_digests():
+    return await get_digests(DB_PATH, limit=10)
 
 
 @app.post("/api/reminders/{reminder_id}/dismiss")
@@ -301,7 +332,8 @@ async def prs_page(request: Request):
 
 @app.get("/reviews", response_class=HTMLResponse)
 async def reviews_page(request: Request):
-    return _render(request, "placeholder.html", title="Reviews", description="PR reviews coming in Phase 4")
+    reviews = await get_reviews(DB_PATH, limit=20)
+    return _render(request, "reviews.html", reviews=reviews)
 
 
 @app.get("/standup", response_class=HTMLResponse)
@@ -312,7 +344,8 @@ async def standup_page(request: Request):
 
 @app.get("/digest", response_class=HTMLResponse)
 async def digest_page(request: Request):
-    return _render(request, "placeholder.html", title="Digest", description="Slack digest coming in Phase 4")
+    digests = await get_digests(DB_PATH, limit=10)
+    return _render(request, "digest.html", digests=digests)
 
 
 @app.get("/jira", response_class=HTMLResponse)
