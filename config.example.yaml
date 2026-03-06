@@ -22,6 +22,9 @@ schedules:
 slack:
   bot_token: "xoxb-your-token-here"
   default_channel: "#your-channel"
+  digest_channels:
+    - "#eng-feed"
+    - "#ai-news"
 
 server:
   host: "127.0.0.1"

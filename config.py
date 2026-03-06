@@ -25,6 +25,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "slack": {
         "bot_token": "",
         "default_channel": "",
+        "digest_channels": [],
     },
     "server": {
         "host": "127.0.0.1",
