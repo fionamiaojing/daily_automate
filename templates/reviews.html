@@ -13,8 +13,8 @@
 {% if reviews %}
     <div class="section-title">Latest Review</div>
     <div class="card">
-        <div class="card-title"><a href="{{ reviews[0].pr_url }}" target="_blank">{{ reviews[0].pr_url }}</a></div>
-        <div class="card-detail">{{ reviews[0].review_summary }}</div>
+        <div class="card-title"><a href="{{ reviews[0].pr_url }}" target="_blank" style="color: var(--accent);">{{ reviews[0].pr_url.replace("https://github.com/", "") }}</a></div>
+        <div class="standup-content">{{ reviews[0].review_summary }}</div>
         {% if reviews[0].action_taken %}
         <div class="card-detail"><strong>Action:</strong> {{ reviews[0].action_taken }}</div>
         {% endif %}
@@ -24,8 +24,8 @@
         <div class="section-title" style="margin-top: 2rem;">History</div>
         {% for review in reviews[1:] %}
         <div class="card" style="margin-bottom: 1rem;">
-            <div class="card-title"><a href="{{ review.pr_url }}" target="_blank">{{ review.pr_url }}</a></div>
-            <div class="card-detail">{{ review.review_summary }}</div>
+            <div class="card-title"><a href="{{ review.pr_url }}" target="_blank" style="color: var(--accent);">{{ review.pr_url.replace("https://github.com/", "") }}</a></div>
+            <div class="standup-content">{{ review.review_summary }}</div>
             {% if review.action_taken %}
             <div class="card-detail"><strong>Action:</strong> {{ review.action_taken }}</div>
             {% endif %}
