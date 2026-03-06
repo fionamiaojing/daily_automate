@@ -324,7 +324,12 @@ async def api_metrics_history(check_id: int):
 
 @app.post("/api/metrics/add")
 async def api_add_metrics_check(request: Request):
-    data = await request.json()
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        data = await request.json()
+    else:
+        form = await request.form()
+        data = dict(form)
     check_id = await create_metrics_check(
         DB_PATH,
         name=data["name"],
