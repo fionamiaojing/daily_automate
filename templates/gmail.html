@@ -19,9 +19,18 @@
     <div class="email-list">
         {% for msg in gmail_data.messages %}
         <div class="card email-card">
-            <div class="email-from">{{ msg.from }}</div>
-            <div class="email-subject">{{ msg.subject }}</div>
-            <div class="email-snippet">{{ msg.snippet }}</div>
+            <div class="email-header">
+                <div>
+                    <div class="email-from">{{ msg.from }}</div>
+                    <div class="email-subject">{{ msg.subject }}</div>
+                    <div class="email-date">{{ msg.date }}</div>
+                </div>
+                <a class="btn btn-sm" href="https://mail.google.com/mail/u/0/#inbox/{{ msg.thread_id or msg.id }}" target="_blank">Open in Gmail</a>
+            </div>
+            <details class="email-body-toggle">
+                <summary class="email-snippet">{{ msg.snippet }}</summary>
+                <div class="email-body">{{ msg.body }}</div>
+            </details>
         </div>
         {% endfor %}
     </div>
