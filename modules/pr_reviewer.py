@@ -1,10 +1,14 @@
-"""PR Reviewer module: reviews PRs assigned to you using Claude."""
+"""PR Reviewer module: reviews PRs using the /review-prs skill.
+
+Delegates the actual review work to Claude's /review-prs skill, which handles
+fetching diffs, analyzing code, and producing structured reviews. This module
+manages the orchestration: finding PRs, storing results, and sending notifications.
+"""
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
-from datetime import datetime
 from pathlib import Path
 
 from db import create_review, log_activity
@@ -13,13 +17,18 @@ from modules.notifier import notify
 logger = logging.getLogger("daily_automate.pr_reviewer")
 
 
-async def _run_cmd(*args: str) -> str:
+async def _run_cmd(*args: str, timeout: int = 300) -> str:
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, stderr = await proc.communicate()
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        logger.error("Command timed out after %ds: %s", timeout, " ".join(args))
+        return ""
     if proc.returncode != 0:
         logger.warning("Command failed: %s\n%s", " ".join(args), stderr.decode())
         return ""
@@ -38,19 +47,14 @@ async def fetch_review_requested_prs() -> list[dict]:
     return json.loads(output)
 
 
-async def review_pr_with_claude(pr_url: str, repo: str, pr_number: int, title: str) -> str:
-    """Use Claude to review a PR."""
-    prompt = (
-        f"Review the pull request #{pr_number} in {repo} titled '{title}'. "
-        f"URL: {pr_url}\n\n"
-        f"Fetch the PR diff using `gh pr diff {pr_number} --repo {repo}` and provide:\n"
-        f"1. A brief summary of the changes\n"
-        f"2. Any concerns or issues found\n"
-        f"3. Suggestions for improvement\n"
-        f"4. Overall assessment (approve / request changes / comment)\n\n"
-        f"Keep the review concise but thorough."
+async def review_pr_with_skill(pr_url: str, repo: str, pr_number: int) -> str:
+    """Use the /review-prs skill to review a single PR."""
+    output = await _run_cmd(
+        "claude", "-p",
+        f"/review-prs {pr_url}",
+        "--output-format", "text",
+        timeout=600,  # reviews can take a while for large PRs
     )
-    output = await _run_cmd("claude", "-p", prompt, "--output-format", "text")
     return output if output else "(Review generation failed)"
 
 
@@ -81,7 +85,7 @@ async def review_prs(db_path: Path, config: dict) -> list[dict]:
 
         logger.info("Reviewing PR #%d: %s", pr_number, title)
 
-        review_text = await review_pr_with_claude(pr_url, repo, pr_number, title)
+        review_text = await review_pr_with_skill(pr_url, repo, pr_number)
         review_text = parse_review_output(review_text)
 
         # Save to DB
